@@ -1,6 +1,6 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
-  "name": "tp-entrance-tracker",
+  "name": "tprandomizerlocationtracker",
   "compatibility_date": "2026-08-25",
   "assets": {
     "not_found_handling": "single-page-application"
