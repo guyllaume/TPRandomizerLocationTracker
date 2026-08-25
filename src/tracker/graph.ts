@@ -1,58 +1,29 @@
-import { MarkerType, type XYPosition } from "@xyflow/react";
+import { MarkerType, type Connection, type XYPosition } from "@xyflow/react";
 import type {
-  RegionDefinition,
-  RegionFlowNode,
+  ArrowMode,
+  LocationDefinition,
+  LocationFlowNode,
   TrackerConnection,
   TrackerFlowEdge,
 } from "../types/tracker";
 
-const DEFAULT_POSITIONS: Record<string, XYPosition> = {
-  "faron-woods": { x: 40, y: 50 },
-  "hyrule-field": { x: 390, y: 30 },
-  "castle-town": { x: 740, y: 60 },
-  "kakariko-village": { x: 150, y: 390 },
-  "lake-hylia": { x: 510, y: 400 },
-  snowpeak: { x: 860, y: 370 },
-};
-
-export function createDefaultPositions(
-  definitions: RegionDefinition[],
-): Record<string, XYPosition> {
-  return Object.fromEntries(
-    definitions.map((region, index) => [
-      region.id,
-      DEFAULT_POSITIONS[region.id] ?? {
-        x: (index % 3) * 360 + 40,
-        y: Math.floor(index / 3) * 340 + 40,
-      },
-    ]),
-  );
-}
-
 export function buildNodes(
-  definitions: RegionDefinition[],
+  definitions: LocationDefinition[],
   positions: Record<string, XYPosition>,
   connections: TrackerConnection[],
-): RegionFlowNode[] {
-  const connectedByRegion = new Map<string, Set<string>>();
+): LocationFlowNode[] {
+  const connectedByLocation = connectedEntrancesByLocation(connections);
 
-  for (const connection of connections) {
-    const source = connectedByRegion.get(connection.sourceRegionId) ?? new Set<string>();
-    source.add(connection.sourceEntranceId);
-    connectedByRegion.set(connection.sourceRegionId, source);
-
-    const target = connectedByRegion.get(connection.targetRegionId) ?? new Set<string>();
-    target.add(connection.targetEntranceId);
-    connectedByRegion.set(connection.targetRegionId, target);
-  }
-
-  return definitions.map((region) => ({
-    id: region.id,
-    type: "region",
-    position: positions[region.id] ?? { x: 0, y: 0 },
+  return definitions.map((location, index) => ({
+    id: location.id,
+    type: "location",
+    position: positions[location.id] ?? {
+      x: (index % 3) * 350 + 40,
+      y: Math.floor(index / 3) * 300 + 40,
+    },
     data: {
-      region,
-      connectedEntranceIds: [...(connectedByRegion.get(region.id) ?? [])],
+      location,
+      connectedEntranceIds: [...(connectedByLocation.get(location.id) ?? [])],
     },
     deletable: false,
   }));
@@ -69,9 +40,9 @@ export function buildEdges(connections: TrackerConnection[]): TrackerFlowEdge[] 
 
     return {
       id: connection.id,
-      source: connection.sourceRegionId,
+      source: connection.sourceLocationId,
       sourceHandle: connection.sourceEntranceId,
-      target: connection.targetRegionId,
+      target: connection.targetLocationId,
       targetHandle: connection.targetEntranceId,
       data: { connection },
       markerStart: connection.arrowMode !== "forward" ? marker : undefined,
@@ -82,14 +53,38 @@ export function buildEdges(connections: TrackerConnection[]): TrackerFlowEdge[] 
   });
 }
 
+export function connectionFromFlow(
+  connection: Connection,
+  id: string,
+  arrowMode: ArrowMode,
+): TrackerConnection | null {
+  if (!connection.sourceHandle || !connection.targetHandle) return null;
+  if (
+    connection.source === connection.target &&
+    connection.sourceHandle === connection.targetHandle
+  ) {
+    return null;
+  }
+
+  return {
+    id,
+    sourceLocationId: connection.source,
+    sourceEntranceId: connection.sourceHandle,
+    targetLocationId: connection.target,
+    targetEntranceId: connection.targetHandle,
+    direction: "discovered",
+    arrowMode,
+  };
+}
+
 export function edgeToConnection(edge: TrackerFlowEdge): TrackerConnection | null {
   if (!edge.sourceHandle || !edge.targetHandle) return null;
 
   return {
     id: edge.id,
-    sourceRegionId: edge.source,
+    sourceLocationId: edge.source,
     sourceEntranceId: edge.sourceHandle,
-    targetRegionId: edge.target,
+    targetLocationId: edge.target,
     targetEntranceId: edge.targetHandle,
     direction: "discovered",
     arrowMode: edge.data?.connection.arrowMode ?? "forward",
@@ -97,40 +92,48 @@ export function edgeToConnection(edge: TrackerFlowEdge): TrackerConnection | nul
 }
 
 export function positionsFromNodes(
-  nodes: RegionFlowNode[],
+  nodes: LocationFlowNode[],
 ): Record<string, XYPosition> {
   return Object.fromEntries(nodes.map((node) => [node.id, node.position]));
 }
 
 export function updateNodeConnectionData(
-  nodes: RegionFlowNode[],
+  nodes: LocationFlowNode[],
   connections: TrackerConnection[],
-): RegionFlowNode[] {
-  const connectedByRegion = new Map<string, Set<string>>();
-  for (const connection of connections) {
-    for (const [regionId, entranceId] of [
-      [connection.sourceRegionId, connection.sourceEntranceId],
-      [connection.targetRegionId, connection.targetEntranceId],
-    ] as const) {
-      const connected = connectedByRegion.get(regionId) ?? new Set<string>();
-      connected.add(entranceId);
-      connectedByRegion.set(regionId, connected);
-    }
-  }
-
+  onRemoveLocation?: (locationId: string) => void,
+): LocationFlowNode[] {
+  const connectedByLocation = connectedEntrancesByLocation(connections);
   return nodes.map((node) => ({
     ...node,
     data: {
       ...node.data,
-      connectedEntranceIds: [...(connectedByRegion.get(node.id) ?? [])],
+      connectedEntranceIds: [...(connectedByLocation.get(node.id) ?? [])],
+      onRemoveLocation,
     },
   }));
 }
 
+function connectedEntrancesByLocation(
+  connections: TrackerConnection[],
+): Map<string, Set<string>> {
+  const result = new Map<string, Set<string>>();
+  for (const connection of connections) {
+    for (const [locationId, entranceId] of [
+      [connection.sourceLocationId, connection.sourceEntranceId],
+      [connection.targetLocationId, connection.targetEntranceId],
+    ] as const) {
+      const connected = result.get(locationId) ?? new Set<string>();
+      connected.add(entranceId);
+      result.set(locationId, connected);
+    }
+  }
+  return result;
+}
+
 export function endpointsKey(connection: Omit<TrackerConnection, "id" | "direction">): string {
   const endpoints = [
-    `${connection.sourceRegionId}:${connection.sourceEntranceId}`,
-    `${connection.targetRegionId}:${connection.targetEntranceId}`,
+    `${connection.sourceLocationId}:${connection.sourceEntranceId}`,
+    `${connection.targetLocationId}:${connection.targetEntranceId}`,
   ].sort();
   return endpoints.join("<->");
 }

@@ -4,7 +4,10 @@ import { createTrackerSave } from "../tracker/importExport";
 import { writeStoredTracker } from "../tracker/persistence";
 
 export function useTrackerPersistence(
-  state: Pick<TrackerSave, "seedName" | "positions" | "connections" | "settings">,
+  state: Pick<
+    TrackerSave,
+    "seedName" | "placedLocationIds" | "positions" | "connections" | "settings"
+  >,
   onStorageError: (message: string) => void,
 ): void {
   useEffect(() => {

@@ -1,63 +1,95 @@
 import { describe, expect, it } from "vitest";
-import { regions } from "../data/regions";
+import { locations } from "../data/locations";
 import type { TrackerSave } from "../types/tracker";
 import { createTrackerSave, exportFilename, parseTrackerSave, validateTrackerSave } from "./importExport";
 
 function validSave(): TrackerSave {
   return createTrackerSave({
     seedName: "Seed 473829",
+    placedLocationIds: ["coro-s-house", "link-s-house"],
     positions: {
-      "kakariko-village": { x: 10, y: 20 },
-      "lake-hylia": { x: 300, y: 400 },
+      "coro-s-house": { x: 10, y: 20 },
+      "link-s-house": { x: 300, y: 400 },
     },
-    connections: [
-      {
-        id: "connection-1",
+    connections: [{
+      id: "connection-1",
+      sourceLocationId: "coro-s-house",
+      sourceEntranceId: "coro-s-house--lower",
+      targetLocationId: "link-s-house",
+      targetEntranceId: "link-s-house--door",
+      direction: "discovered",
+      arrowMode: "forward",
+    }],
+    settings: {
+      showMinimap: true,
+      defaultArrowMode: "forward",
+      hidePlacedLocations: false,
+    },
+  });
+}
+
+describe("tracker save validation", () => {
+  it("round-trips placed locations, positions, connections, and settings", () => {
+    const original = validSave();
+    const result = parseTrackerSave(JSON.stringify(original), locations);
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.save).toEqual(original);
+      expect(result.save).not.toHaveProperty("locations");
+    }
+  });
+
+  it("loads saves without optional arrow and palette settings with safe defaults", () => {
+    const olderSave = validSave() as unknown as {
+      connections: Array<Record<string, unknown>>;
+      settings: Record<string, unknown>;
+    };
+    delete olderSave.connections[0].arrowMode;
+    delete olderSave.settings.defaultArrowMode;
+    delete olderSave.settings.hidePlacedLocations;
+
+    const result = validateTrackerSave(olderSave, locations);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.save.connections[0].arrowMode).toBe("forward");
+      expect(result.save.settings.defaultArrowMode).toBe("forward");
+      expect(result.save.settings.hidePlacedLocations).toBe(false);
+    }
+  });
+
+  it("migrates prototype saves and ignores obsolete graph references", () => {
+    const result = validateTrackerSave({
+      schemaVersion: 1,
+      trackerVersion: "0.1.0",
+      savedAt: "2026-08-25T12:00:00.000Z",
+      seedName: "Old run",
+      positions: {
+        "kakariko-village": { x: 10, y: 20 },
+        "not-a-location": { x: 0, y: 0 },
+      },
+      connections: [{
+        id: "old-connection",
         sourceRegionId: "kakariko-village",
         sourceEntranceId: "kakariko-graveyard",
         targetRegionId: "lake-hylia",
         targetEntranceId: "lake-spirit-cave",
         direction: "discovered",
-        arrowMode: "forward",
-      },
-    ],
-    settings: { showMinimap: true, defaultArrowMode: "forward" },
-  });
-}
-
-describe("tracker save validation", () => {
-  it("round-trips a valid save", () => {
-    const original = validSave();
-    const result = parseTrackerSave(JSON.stringify(original), regions);
+      }],
+      settings: { showMinimap: true },
+    }, locations);
 
     expect(result.ok).toBe(true);
-    if (result.ok) expect(result.save).toEqual(original);
-  });
-
-  it("loads older saves without an arrow mode as forward arrows", () => {
-    const legacySave = validSave() as unknown as {
-      connections: Array<Record<string, unknown>>;
-    };
-    delete legacySave.connections[0].arrowMode;
-
-    const result = validateTrackerSave(legacySave, regions);
-    expect(result.ok).toBe(true);
-    if (result.ok) expect(result.save.connections[0].arrowMode).toBe("forward");
-  });
-
-  it("loads older saves without a default arrow setting as forward", () => {
-    const legacySave = validSave() as unknown as {
-      settings: Record<string, unknown>;
-    };
-    delete legacySave.settings.defaultArrowMode;
-
-    const result = validateTrackerSave(legacySave, regions);
-    expect(result.ok).toBe(true);
-    if (result.ok) expect(result.save.settings.defaultArrowMode).toBe("forward");
+    if (result.ok) {
+      expect(result.save.schemaVersion).toBe(2);
+      expect(result.save.placedLocationIds).toEqual(["kakariko-village"]);
+      expect(result.save.connections).toEqual([]);
+      expect(result.warnings.join(" ")).toContain("obsolete connection");
+    }
   });
 
   it("rejects invalid JSON without throwing", () => {
-    expect(parseTrackerSave("{bad json", regions)).toEqual({
+    expect(parseTrackerSave("{bad json", locations)).toEqual({
       ok: false,
       error: "The selected file is not valid JSON.",
     });
@@ -67,24 +99,46 @@ describe("tracker save validation", () => {
     const save = validSave();
     save.connections[0].targetEntranceId = "not-an-entrance";
 
-    const result = validateTrackerSave(save, regions);
+    const result = validateTrackerSave(save, locations);
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error).toContain("unknown target entrance");
+  });
+
+  it("rejects connections that violate one-way handle direction", () => {
+    const save = validSave();
+    save.placedLocationIds = ["sacred-grove-past", "coro-s-house"];
+    save.positions = {
+      "sacred-grove-past": { x: 0, y: 0 },
+      "coro-s-house": { x: 300, y: 0 },
+    };
+    save.connections[0] = {
+      id: "bad-direction",
+      sourceLocationId: "sacred-grove-past",
+      sourceEntranceId: "sacred-grove-past--warp-in-after-boss--in",
+      targetLocationId: "coro-s-house",
+      targetEntranceId: "coro-s-house--lower",
+      direction: "discovered",
+      arrowMode: "forward",
+    };
+
+    const result = validateTrackerSave(save, locations);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toContain("arrival-only");
   });
 
   it("rejects the same relationship in reverse", () => {
     const save = validSave();
     save.connections.push({
       id: "connection-2",
-      sourceRegionId: "lake-hylia",
-      sourceEntranceId: "lake-spirit-cave",
-      targetRegionId: "kakariko-village",
-      targetEntranceId: "kakariko-graveyard",
+      sourceLocationId: "link-s-house",
+      sourceEntranceId: "link-s-house--door",
+      targetLocationId: "coro-s-house",
+      targetEntranceId: "coro-s-house--lower",
       direction: "discovered",
       arrowMode: "reverse",
     });
 
-    const result = validateTrackerSave(save, regions);
+    const result = validateTrackerSave(save, locations);
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error).toContain("duplicates another connection");
   });
