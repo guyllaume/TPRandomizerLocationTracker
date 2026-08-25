@@ -12,6 +12,7 @@ interface TrackerToolbarProps {
   onImportClick: () => void;
   onImportFile: (event: ChangeEvent<HTMLInputElement>) => void;
   onReset: () => void;
+  onFitView: () => void;
   onToggleMinimap: () => void;
   onDefaultArrowModeChange: (mode: ArrowMode) => void;
 }
@@ -27,6 +28,7 @@ export function TrackerToolbar({
   onImportClick,
   onImportFile,
   onReset,
+  onFitView,
   onToggleMinimap,
   onDefaultArrowModeChange,
 }: TrackerToolbarProps) {
@@ -64,6 +66,7 @@ export function TrackerToolbar({
       </label>
 
       <div className="toolbar-actions">
+        <button type="button" onClick={onFitView}>Fit View</button>
         <button type="button" onClick={onToggleMinimap} aria-pressed={showMinimap}>
           {showMinimap ? "Hide map" : "Show map"}
         </button>

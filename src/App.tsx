@@ -12,18 +12,20 @@ import {
   type Edge,
   type EdgeTypes,
   type NodeTypes,
+  type ReactFlowInstance,
 } from "@xyflow/react";
 import { useCallback, useMemo, useRef, useState, type ChangeEvent } from "react";
-import { RegionNode } from "./components/RegionNode";
-import { TrackerToolbar } from "./components/TrackerToolbar";
+import { LocationNode } from "./components/LocationNode";
+import { LocationPalette } from "./components/LocationPalette";
 import { TrackerEdge } from "./components/TrackerEdge";
-import { regions } from "./data/regions";
+import { TrackerToolbar } from "./components/TrackerToolbar";
+import { entrancesById, locations, locationsById } from "./data/locations";
 import { useTrackerPersistence } from "./hooks/useTrackerPersistence";
 import { DEFAULT_SETTINGS } from "./tracker/constants";
 import {
   buildEdges,
   buildNodes,
-  createDefaultPositions,
+  connectionFromFlow,
   edgeToConnection,
   endpointsKey,
   positionsFromNodes,
@@ -34,43 +36,23 @@ import {
   downloadTrackerSave,
   parseTrackerSave,
 } from "./tracker/importExport";
-import {
-  clearStoredTracker,
-  readStoredTracker,
-} from "./tracker/persistence";
+import { clearStoredTracker, readStoredTracker } from "./tracker/persistence";
 import type {
   ArrowMode,
-  RegionFlowNode,
+  LocationDefinition,
+  LocationFlowNode,
   TrackerConnection,
   TrackerFlowEdge,
   TrackerSettings,
 } from "./types/tracker";
 
-const nodeTypes: NodeTypes = { region: RegionNode };
+const nodeTypes: NodeTypes = { location: LocationNode };
 const edgeTypes: EdgeTypes = { tracker: TrackerEdge };
 
-function connectionFromFlow(
-  connection: Connection,
-  id: string,
-  arrowMode: ArrowMode,
-): TrackerConnection | null {
-  if (!connection.sourceHandle || !connection.targetHandle) return null;
-  if (
-    connection.source === connection.target &&
-    connection.sourceHandle === connection.targetHandle
-  ) {
-    return null;
-  }
-
-  return {
-    id,
-    sourceRegionId: connection.source,
-    sourceEntranceId: connection.sourceHandle,
-    targetRegionId: connection.target,
-    targetEntranceId: connection.targetHandle,
-    direction: "discovered",
-    arrowMode,
-  };
+function definitionsForIds(ids: string[]): LocationDefinition[] {
+  return ids
+    .map((id) => locationsById.get(id))
+    .filter((location): location is LocationDefinition => location !== undefined);
 }
 
 function newConnectionId(): string {
@@ -79,13 +61,15 @@ function newConnectionId(): string {
 }
 
 export default function App() {
-  const [initial] = useState(() => readStoredTracker(regions));
-  const defaultPositions = useMemo(() => createDefaultPositions(regions), []);
-  const initialPositions = { ...defaultPositions, ...initial.save?.positions };
+  const [initial] = useState(() => readStoredTracker(locations));
+  const initialPlacedIds = initial.save?.placedLocationIds ?? [];
   const initialConnections = initial.save?.connections ?? [];
-
-  const [nodes, setNodes, onNodesChange] = useNodesState<RegionFlowNode>(
-    buildNodes(regions, initialPositions, initialConnections),
+  const [nodes, setNodes, onNodesChange] = useNodesState<LocationFlowNode>(
+    buildNodes(
+      definitionsForIds(initialPlacedIds),
+      initial.save?.positions ?? {},
+      initialConnections,
+    ),
   );
   const [edges, setEdges, onEdgesChange] = useEdgesState<TrackerFlowEdge>(
     buildEdges(initialConnections),
@@ -94,11 +78,13 @@ export default function App() {
   const [settings, setSettings] = useState<TrackerSettings>(
     initial.save?.settings ?? { ...DEFAULT_SETTINGS },
   );
-  const [notice, setNotice] = useState(initial.error ?? "");
+  const [notice, setNotice] = useState(initial.notice ?? initial.error ?? "");
   const [storageWarning, setStorageWarning] = useState(
     initial.storageAvailable ? "" : initial.error ?? "Browser persistence is unavailable.",
   );
   const importInputRef = useRef<HTMLInputElement>(null);
+  const canvasRef = useRef<HTMLElement>(null);
+  const flowRef = useRef<ReactFlowInstance<LocationFlowNode, TrackerFlowEdge> | null>(null);
 
   const connections = useMemo(
     () => edges.map(edgeToConnection).filter((item): item is TrackerConnection => item !== null),
@@ -108,144 +94,199 @@ export default function App() {
     const selectedEdge = edges.find((edge) => edge.selected);
     return selectedEdge ? edgeToConnection(selectedEdge) : null;
   }, [edges]);
-  const displayNodes = useMemo(
-    () => updateNodeConnectionData(nodes, connections),
-    [nodes, connections],
-  );
+  const selectedConnectionIsOneWay = selectedConnection
+    ? entrancesById.get(selectedConnection.sourceEntranceId)?.entrance.direction !== "both" ||
+      entrancesById.get(selectedConnection.targetEntranceId)?.entrance.direction !== "both"
+    : false;
+  const placedLocationIds = useMemo(() => nodes.map((node) => node.id), [nodes]);
+  const placedLocationIdSet = useMemo(() => new Set(placedLocationIds), [placedLocationIds]);
   const positions = useMemo(() => positionsFromNodes(nodes), [nodes]);
+
+  const removeLocation = useCallback((locationId: string) => {
+    if (connections.some((connection) =>
+      connection.sourceLocationId === locationId || connection.targetLocationId === locationId,
+    )) {
+      setNotice("Disconnect this location before removing it from the canvas.");
+      return;
+    }
+    setNodes((currentNodes) => currentNodes.filter((node) => node.id !== locationId));
+    setNotice("Location removed from the canvas. Its static definition remains in the palette.");
+  }, [connections, setNodes]);
+
+  const displayNodes = useMemo(
+    () => updateNodeConnectionData(nodes, connections, removeLocation),
+    [connections, nodes, removeLocation],
+  );
   const persistenceState = useMemo(
     () => ({
       seedName: seedName.trim() || undefined,
+      placedLocationIds,
       positions,
       connections,
       settings,
     }),
-    [seedName, positions, connections, settings],
+    [seedName, placedLocationIds, positions, connections, settings],
   );
 
-  const handleStorageError = useCallback((message: string) => {
-    setStorageWarning(message);
-  }, []);
+  const handleStorageError = useCallback((message: string) => setStorageWarning(message), []);
   useTrackerPersistence(persistenceState, handleStorageError);
 
-  const addConnection = useCallback(
-    (connection: Connection) => {
-      const candidate = connectionFromFlow(
-        connection,
-        newConnectionId(),
-        settings.defaultArrowMode,
-      );
-      if (!candidate) {
-        setNotice("Choose two different entrance handles to create a connection.");
-        return;
-      }
+  const isConnectionValid = useCallback((candidate: Connection | Edge) => {
+    if (!candidate.sourceHandle || !candidate.targetHandle) return false;
+    const source = entrancesById.get(candidate.sourceHandle);
+    const target = entrancesById.get(candidate.targetHandle);
+    return source?.locationId === candidate.source &&
+      target?.locationId === candidate.target &&
+      source.entrance.direction !== "in" &&
+      target.entrance.direction !== "out" &&
+      !(candidate.source === candidate.target && candidate.sourceHandle === candidate.targetHandle);
+  }, []);
 
-      const pair = endpointsKey(candidate);
-      if (connections.some((existing) => endpointsKey(existing) === pair)) {
-        setNotice("That entrance connection is already recorded.");
-        return;
-      }
+  const addConnection = useCallback((connection: Connection) => {
+    if (!isConnectionValid(connection)) {
+      setNotice("That connection conflicts with an incoming or outgoing one-way entrance.");
+      return;
+    }
+    const isOneWay = entrancesById.get(connection.sourceHandle ?? "")?.entrance.direction !== "both" ||
+      entrancesById.get(connection.targetHandle ?? "")?.entrance.direction !== "both";
+    const candidate = connectionFromFlow(
+      connection,
+      newConnectionId(),
+      isOneWay ? "forward" : settings.defaultArrowMode,
+    );
+    if (!candidate) {
+      setNotice("Choose two different entrance handles to create a connection.");
+      return;
+    }
 
-      setEdges((currentEdges) => [...currentEdges, ...buildEdges([candidate])]);
-      setNotice("Connection recorded. Select it and press Delete to remove it.");
-    },
-    [connections, setEdges, settings.defaultArrowMode],
-  );
+    const pair = endpointsKey(candidate);
+    if (connections.some((existing) => endpointsKey(existing) === pair)) {
+      setNotice("That entrance connection is already recorded.");
+      return;
+    }
 
-  const reconnect = useCallback(
-    (oldEdge: Edge, connection: Connection) => {
-      const existingArrowMode =
-        connections.find((existing) => existing.id === oldEdge.id)?.arrowMode ?? "forward";
-      const candidate = connectionFromFlow(connection, oldEdge.id, existingArrowMode);
-      if (!candidate) {
-        setNotice("A connection cannot lead back to the same entrance.");
-        return;
-      }
-      const pair = endpointsKey(candidate);
-      if (
-        connections.some(
-          (existing) => existing.id !== oldEdge.id && endpointsKey(existing) === pair,
-        )
-      ) {
-        setNotice("That entrance connection is already recorded.");
-        return;
-      }
+    setEdges((currentEdges) => [...currentEdges, ...buildEdges([candidate])]);
+    setNotice("Connection recorded. Select it and press Delete to remove it.");
+  }, [connections, isConnectionValid, setEdges, settings.defaultArrowMode]);
 
-      setEdges((currentEdges) =>
-        currentEdges.map((edge) =>
-          edge.id === oldEdge.id ? buildEdges([candidate])[0] : edge,
-        ),
-      );
-      setNotice("Connection updated.");
-    },
-    [connections, setEdges],
-  );
+  const reconnect = useCallback((oldEdge: Edge, connection: Connection) => {
+    if (!isConnectionValid(connection)) {
+      setNotice("That connection conflicts with an incoming or outgoing one-way entrance.");
+      return;
+    }
+    const isOneWay = entrancesById.get(connection.sourceHandle ?? "")?.entrance.direction !== "both" ||
+      entrancesById.get(connection.targetHandle ?? "")?.entrance.direction !== "both";
+    const existingArrowMode = isOneWay ? "forward" :
+      connections.find((existing) => existing.id === oldEdge.id)?.arrowMode ?? "forward";
+    const candidate = connectionFromFlow(connection, oldEdge.id, existingArrowMode);
+    if (!candidate) {
+      setNotice("A connection cannot lead back to the same entrance.");
+      return;
+    }
+    const pair = endpointsKey(candidate);
+    if (connections.some(
+      (existing) => existing.id !== oldEdge.id && endpointsKey(existing) === pair,
+    )) {
+      setNotice("That entrance connection is already recorded.");
+      return;
+    }
+
+    setEdges((currentEdges) => currentEdges.map((edge) =>
+      edge.id === oldEdge.id ? buildEdges([candidate])[0] : edge,
+    ));
+    setNotice("Connection updated.");
+  }, [connections, isConnectionValid, setEdges]);
 
   const changeArrowMode = useCallback(
     (connection: TrackerConnection, arrowMode: ArrowMode) => {
+      const isOneWay =
+        entrancesById.get(connection.sourceEntranceId)?.entrance.direction !== "both" ||
+        entrancesById.get(connection.targetEntranceId)?.entrance.direction !== "both";
+      if (isOneWay && arrowMode !== "forward") {
+        setNotice("One-way connections keep their dataset-defined direction.");
+        return;
+      }
       const updated = { ...connection, arrowMode };
-      setEdges((currentEdges) =>
-        currentEdges.map((edge) =>
-          edge.id === connection.id
-            ? { ...buildEdges([updated])[0], selected: edge.selected }
-            : edge,
-        ),
-      );
+      setEdges((currentEdges) => currentEdges.map((edge) =>
+        edge.id === connection.id
+          ? { ...buildEdges([updated])[0], selected: edge.selected }
+          : edge,
+      ));
       setNotice("Arrow direction updated.");
     },
     [setEdges],
   );
 
-  const deleteConnection = useCallback(
-    (connectionId: string) => {
-      setEdges((currentEdges) => currentEdges.filter((edge) => edge.id !== connectionId));
-      setNotice("Connection deleted.");
-    },
-    [setEdges],
-  );
+  const deleteConnection = useCallback((connectionId: string) => {
+    setEdges((currentEdges) => currentEdges.filter((edge) => edge.id !== connectionId));
+    setNotice("Connection deleted.");
+  }, [setEdges]);
+
+  const addLocation = useCallback((locationId: string) => {
+    const location = locationsById.get(locationId);
+    if (!location || placedLocationIdSet.has(locationId)) return;
+
+    const bounds = canvasRef.current?.getBoundingClientRect();
+    const flowPosition = bounds && flowRef.current
+      ? flowRef.current.screenToFlowPosition({
+          x: bounds.left + bounds.width / 2,
+          y: bounds.top + bounds.height / 2,
+        })
+      : { x: 80, y: 80 };
+    const stagger = (nodes.length % 6) * 24;
+    const position = { x: flowPosition.x - 150 + stagger, y: flowPosition.y - 80 + stagger };
+    setNodes((currentNodes) => [
+      ...currentNodes,
+      ...buildNodes([location], { [locationId]: position }, connections),
+    ]);
+    setNotice(`${location.name} added to the canvas.`);
+  }, [connections, nodes.length, placedLocationIdSet, setNodes]);
 
   const exportRun = useCallback(() => {
     downloadTrackerSave(createTrackerSave(persistenceState));
     setNotice("Run exported as a JSON backup.");
   }, [persistenceState]);
 
-  const importRun = useCallback(
-    async (event: ChangeEvent<HTMLInputElement>) => {
-      const file = event.target.files?.[0];
-      event.target.value = "";
-      if (!file) return;
+  const importRun = useCallback(async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
 
-      try {
-        const result = parseTrackerSave(await file.text(), regions);
-        if (!result.ok) {
-          setNotice(`Import failed: ${result.error} Your current run was not changed.`);
-          return;
-        }
-
-        const importedPositions = { ...defaultPositions, ...result.save.positions };
-        setNodes(buildNodes(regions, importedPositions, result.save.connections));
-        setEdges(buildEdges(result.save.connections));
-        setSeedName(result.save.seedName ?? "");
-        setSettings(result.save.settings);
-        setNotice("Run imported successfully.");
-      } catch {
-        setNotice("Import failed: the file could not be read. Your current run was not changed.");
+    try {
+      const result = parseTrackerSave(await file.text(), locations);
+      if (!result.ok) {
+        setNotice(`Import failed: ${result.error} Your current run was not changed.`);
+        return;
       }
-    },
-    [defaultPositions, setEdges, setNodes],
-  );
+
+      setNodes(buildNodes(
+        definitionsForIds(result.save.placedLocationIds),
+        result.save.positions,
+        result.save.connections,
+      ));
+      setEdges(buildEdges(result.save.connections));
+      setSeedName(result.save.seedName ?? "");
+      setSettings(result.save.settings);
+      setNotice(result.warnings.length > 0
+        ? `Run imported. ${result.warnings.join(" ")}`
+        : "Run imported successfully.");
+    } catch {
+      setNotice("Import failed: the file could not be read. Your current run was not changed.");
+    }
+  }, [setEdges, setNodes]);
 
   const resetRun = useCallback(() => {
-    if (!window.confirm("Reset this run? All positions and discovered connections will be cleared.")) {
-      return;
-    }
+    if (!window.confirm(
+      "Reset this run? All placed locations, positions, and discovered connections will be cleared.",
+    )) return;
+
     clearStoredTracker();
-    setNodes(buildNodes(regions, defaultPositions, []));
+    setNodes([]);
     setEdges([]);
     setSeedName("");
     setSettings({ ...DEFAULT_SETTINGS });
-    setNotice("Run reset.");
-  }, [defaultPositions, setEdges, setNodes]);
+    setNotice("Run reset. The canvas has no locations or connections.");
+  }, [setEdges, setNodes]);
 
   return (
     <main className="app-shell">
@@ -260,6 +301,7 @@ export default function App() {
         onImportClick={() => importInputRef.current?.click()}
         onImportFile={importRun}
         onReset={resetRun}
+        onFitView={() => void flowRef.current?.fitView({ padding: 0.18 })}
         onToggleMinimap={() =>
           setSettings((current) => ({ ...current, showMinimap: !current.showMinimap }))
         }
@@ -281,89 +323,102 @@ export default function App() {
         </div>
       )}
 
-      <section className="canvas" aria-label="Entrance connection graph">
-        <ReactFlow
-          nodes={displayNodes}
-          edges={edges}
-          nodeTypes={nodeTypes}
-          edgeTypes={edgeTypes}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
-          onConnect={addConnection}
-          onReconnect={reconnect}
-          onEdgeClick={() =>
-            setNotice("Drag either highlighted endpoint to another entrance to reconnect this arrow.")
+      <div className="tracker-workspace">
+        <LocationPalette
+          locations={locations}
+          placedLocationIds={placedLocationIdSet}
+          hidePlaced={settings.hidePlacedLocations}
+          onHidePlacedChange={(hidePlacedLocations) =>
+            setSettings((current) => ({ ...current, hidePlacedLocations }))
           }
-          connectionMode={ConnectionMode.Loose}
-          fitView
-          fitViewOptions={{ padding: 0.18 }}
-          minZoom={0.25}
-          maxZoom={2}
-          nodesConnectable
-          connectOnClick
-          nodesDraggable
-          nodesFocusable
-          edgesReconnectable
-          reconnectRadius={7}
-          elevateEdgesOnSelect
-          deleteKeyCode={["Backspace", "Delete"]}
-          proOptions={{ hideAttribution: true }}
-        >
-          <Background variant={BackgroundVariant.Dots} gap={22} size={1.2} />
-          <Controls position="bottom-left" />
-          {settings.showMinimap && (
-            <MiniMap
-              position="bottom-right"
-              pannable
-              zoomable
-              nodeColor="var(--minimap-node)"
-              maskColor="var(--minimap-mask)"
-            />
+          onAddLocation={addLocation}
+        />
+        <section ref={canvasRef} className="canvas" aria-label="Entrance connection graph">
+          <ReactFlow
+            nodes={displayNodes}
+            edges={edges}
+            nodeTypes={nodeTypes}
+            edgeTypes={edgeTypes}
+            onInit={(instance) => { flowRef.current = instance; }}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
+            onConnect={addConnection}
+            onReconnect={reconnect}
+            isValidConnection={isConnectionValid}
+            onEdgeClick={() =>
+              setNotice("Drag either highlighted endpoint to another entrance to reconnect this arrow.")
+            }
+            connectionMode={ConnectionMode.Loose}
+            fitView
+            fitViewOptions={{ padding: 0.18 }}
+            minZoom={0.25}
+            maxZoom={2}
+            nodesConnectable
+            connectOnClick
+            nodesDraggable
+            nodesFocusable
+            edgesReconnectable
+            reconnectRadius={7}
+            elevateEdgesOnSelect
+            deleteKeyCode={["Backspace", "Delete"]}
+            proOptions={{ hideAttribution: true }}
+          >
+            <Background variant={BackgroundVariant.Dots} gap={22} size={1.2} />
+            <Controls position="bottom-left" />
+            {settings.showMinimap && nodes.length > 0 && (
+              <MiniMap
+                position="bottom-right"
+                pannable
+                zoomable
+                nodeColor="var(--minimap-node)"
+                maskColor="var(--minimap-mask)"
+              />
+            )}
+            {selectedConnection && (
+              <Panel position="top-right" className="edge-editor">
+                <span>{selectedConnectionIsOneWay ? "One-way direction" : "Arrow direction"}</span>
+                <div className="edge-editor-actions" role="group" aria-label="Arrow direction">
+                  <button
+                    type="button"
+                    aria-pressed={selectedConnection.arrowMode === "forward"}
+                    onClick={() => changeArrowMode(selectedConnection, "forward")}
+                    title="Source to target"
+                  >→</button>
+                  <button
+                    type="button"
+                    aria-pressed={selectedConnection.arrowMode === "reverse"}
+                    disabled={selectedConnectionIsOneWay}
+                    onClick={() => changeArrowMode(selectedConnection, "reverse")}
+                    title="Target to source"
+                  >←</button>
+                  <button
+                    type="button"
+                    aria-pressed={selectedConnection.arrowMode === "bidirectional"}
+                    disabled={selectedConnectionIsOneWay}
+                    onClick={() => changeArrowMode(selectedConnection, "bidirectional")}
+                    title="Bidirectional"
+                  >↔</button>
+                  <button
+                    type="button"
+                    className="edge-delete-button"
+                    onClick={() => deleteConnection(selectedConnection.id)}
+                    title="Delete connection"
+                  >Delete</button>
+                </div>
+              </Panel>
+            )}
+          </ReactFlow>
+          {nodes.length === 0 && (
+            <div className="empty-canvas">
+              <h2>Build this run as you explore</h2>
+              <p>Search the location palette and add a card to begin. New runs start with no connections.</p>
+            </div>
           )}
-          {selectedConnection && (
-            <Panel position="top-right" className="edge-editor">
-              <span>Arrow direction</span>
-              <div className="edge-editor-actions" role="group" aria-label="Arrow direction">
-                <button
-                  type="button"
-                  aria-pressed={selectedConnection.arrowMode === "forward"}
-                  onClick={() => changeArrowMode(selectedConnection, "forward")}
-                  title="Source to target"
-                >
-                  →
-                </button>
-                <button
-                  type="button"
-                  aria-pressed={selectedConnection.arrowMode === "reverse"}
-                  onClick={() => changeArrowMode(selectedConnection, "reverse")}
-                  title="Target to source"
-                >
-                  ←
-                </button>
-                <button
-                  type="button"
-                  aria-pressed={selectedConnection.arrowMode === "bidirectional"}
-                  onClick={() => changeArrowMode(selectedConnection, "bidirectional")}
-                  title="Bidirectional"
-                >
-                  ↔
-                </button>
-                <button
-                  type="button"
-                  className="edge-delete-button"
-                  onClick={() => deleteConnection(selectedConnection.id)}
-                  title="Delete connection"
-                >
-                  Delete
-                </button>
-              </div>
-            </Panel>
-          )}
-        </ReactFlow>
-        <p className="canvas-help">
-          Drag a circle from one entrance to another. Select an arrow and press Delete to remove it.
-        </p>
-      </section>
+          <p className="canvas-help">
+            Drag a handle to another entrance. One-way OUT handles start connections; IN handles receive them.
+          </p>
+        </section>
+      </div>
     </main>
   );
 }
