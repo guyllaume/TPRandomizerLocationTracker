@@ -6,9 +6,10 @@ import { EntranceHandle } from "./EntranceHandle";
 function LocationNodeComponent({ id, data, selected }: NodeProps<LocationFlowNode>) {
   const connected = new Set(data.connectedEntranceIds);
   const isSpecial = data.location.specialFlags?.includes("hyrule-castle");
+  const focusClass = data.focusState ? `is-${data.focusState}` : "";
 
   return (
-    <article className={`location-node ${selected ? "is-selected" : ""}`}>
+    <article className={`location-node ${selected ? "is-selected" : ""} ${focusClass}`.trim()}>
       <header className="location-header">
         <div className="location-title">
           <div className="location-name-line">

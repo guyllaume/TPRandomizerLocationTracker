@@ -39,6 +39,7 @@ export function TrackerEdge({
   markerEnd,
   style,
   interactionWidth,
+  data,
 }: EdgeProps<TrackerFlowEdge>) {
   const source = offsetEndpoint(sourceX, sourceY, sourcePosition);
   const target = offsetEndpoint(targetX, targetY, targetPosition);
@@ -52,13 +53,16 @@ export function TrackerEdge({
     borderRadius: 8,
   });
 
+  const focusState = data?.focusState;
+  const opacityStyle = focusState === "dimmed" ? { opacity: 0.15 } : {};
+
   return (
     <BaseEdge
       id={id}
       path={path}
       markerStart={markerStart}
       markerEnd={markerEnd}
-      style={style}
+      style={{ ...style, ...opacityStyle }}
       interactionWidth={interactionWidth}
     />
   );

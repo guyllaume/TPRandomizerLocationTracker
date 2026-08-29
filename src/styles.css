@@ -434,12 +434,20 @@ select:focus-visible,
   border: 1px solid var(--border-strong);
   border-radius: 10px;
   box-shadow: var(--shadow);
-  transition: border-color 120ms ease, box-shadow 120ms ease;
+  transition: border-color 120ms ease, box-shadow 120ms ease, opacity 200ms ease;
 }
 
 .location-node.is-selected {
   border-color: var(--accent-bright);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-bright) 20%, transparent), var(--shadow);
+}
+
+.location-node.is-related {
+  opacity: 1;
+}
+
+.location-node.is-dimmed {
+  opacity: 0.15;
 }
 
 .location-header {
@@ -656,6 +664,7 @@ select:focus-visible,
 
 .react-flow__edge-path {
   stroke: var(--accent);
+  transition: opacity 200ms ease;
 }
 
 .react-flow__edge.selected .react-flow__edge-path {

@@ -28,6 +28,7 @@ import {
   connectionFromFlow,
   edgeToConnection,
   endpointsKey,
+  getDirectlyConnectedLocations,
   positionsFromNodes,
   updateNodeConnectionData,
 } from "./tracker/graph";
@@ -58,6 +59,70 @@ function definitionsForIds(ids: string[]): LocationDefinition[] {
 function newConnectionId(): string {
   const uniquePart = crypto.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`;
   return `connection-${uniquePart}`;
+}
+
+function applyFocusState(
+  nodes: LocationFlowNode[],
+  edges: TrackerFlowEdge[],
+  connections: TrackerConnection[],
+): { nodes: LocationFlowNode[]; edges: TrackerFlowEdge[] } {
+  const selectedNode = nodes.find((node) => node.selected);
+  if (!selectedNode) {
+    return { nodes, edges };
+  }
+
+  const relatedLocationIds = getDirectlyConnectedLocations(selectedNode.id, connections);
+
+  const updatedNodes = nodes.map((node) => {
+    let focusState: "selected" | "related" | "dimmed" | undefined;
+    if (node.id === selectedNode.id) {
+      focusState = "selected";
+    } else if (relatedLocationIds.has(node.id)) {
+      focusState = "related";
+    } else {
+      focusState = "dimmed";
+    }
+
+    return {
+      ...node,
+      data: {
+        ...node.data,
+        focusState,
+      },
+    };
+  });
+
+  const updatedEdges = edges.map((edge) => {
+    const sourceIsSelected = edge.source === selectedNode.id;
+    const targetIsSelected = edge.target === selectedNode.id;
+    const sourceIsRelated = relatedLocationIds.has(edge.source);
+    const targetIsRelated = relatedLocationIds.has(edge.target);
+
+    let focusState: "related" | "dimmed" | undefined;
+    if (
+      (sourceIsSelected && targetIsRelated) ||
+      (targetIsSelected && sourceIsRelated)
+    ) {
+      focusState = "related";
+    } else {
+      focusState = "dimmed";
+    }
+
+    const connection = edge.data?.connection;
+    if (!connection) {
+      return edge;
+    }
+
+    return {
+      ...edge,
+      data: {
+        connection,
+        focusState,
+      },
+    };
+  });
+
+  return { nodes: updatedNodes, edges: updatedEdges };
 }
 
 export default function App() {
@@ -113,10 +178,16 @@ export default function App() {
     setNotice("Location removed from the canvas. Its static definition remains in the palette.");
   }, [connections, setNodes]);
 
-  const displayNodes = useMemo(
+  const nodesWithConnectionData = useMemo(
     () => updateNodeConnectionData(nodes, connections, removeLocation),
     [connections, nodes, removeLocation],
   );
+
+  const { nodes: displayNodes, edges: displayEdges } = useMemo(
+    () => applyFocusState(nodesWithConnectionData, edges, connections),
+    [connections, edges, nodesWithConnectionData],
+  );
+
   const persistenceState = useMemo(
     () => ({
       seedName: seedName.trim() || undefined,
@@ -336,7 +407,7 @@ export default function App() {
         <section ref={canvasRef} className="canvas" aria-label="Entrance connection graph">
           <ReactFlow
             nodes={displayNodes}
-            edges={edges}
+            edges={displayEdges}
             nodeTypes={nodeTypes}
             edgeTypes={edgeTypes}
             onInit={(instance) => { flowRef.current = instance; }}
