@@ -54,7 +54,11 @@ export function TrackerEdge({
   });
 
   const focusState = data?.focusState;
-  const opacityStyle = focusState === "dimmed" ? { opacity: 0.15 } : {};
+  const focusStyle = focusState === "dimmed"
+    ? { opacity: 0.15 }
+    : focusState === "warp-route"
+      ? { opacity: 1, stroke: "var(--warp-route)", strokeWidth: 4 }
+      : {};
 
   return (
     <BaseEdge
@@ -62,7 +66,7 @@ export function TrackerEdge({
       path={path}
       markerStart={markerStart}
       markerEnd={markerEnd}
-      style={{ ...style, ...opacityStyle }}
+      style={{ ...style, ...focusStyle }}
       interactionWidth={interactionWidth}
     />
   );

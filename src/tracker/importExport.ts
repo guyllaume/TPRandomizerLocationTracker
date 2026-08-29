@@ -143,6 +143,9 @@ function validateCurrentSave(
   }
 
   const locationIds = new Set(definitions.map((location) => location.id));
+  const warpLocationIds = new Set(
+    definitions.filter((location) => location.hasWarp).map((location) => location.id),
+  );
   const placedLocationIds: string[] = [];
   const placedSet = new Set<string>();
   for (const locationId of value.placedLocationIds) {
@@ -154,6 +157,26 @@ function validateCurrentSave(
     }
     placedSet.add(locationId);
     placedLocationIds.push(locationId);
+  }
+
+  const rawActivatedWarpLocationIds = value.activatedWarpLocationIds ?? [];
+  if (!Array.isArray(rawActivatedWarpLocationIds)) {
+    return { ok: false, error: "The save has an invalid activated-warp list." };
+  }
+  const activatedWarpLocationIds: string[] = [];
+  const activatedWarpSet = new Set<string>();
+  for (const locationId of rawActivatedWarpLocationIds) {
+    if (!isNonEmptyString(locationId) || !warpLocationIds.has(locationId)) {
+      return { ok: false, error: `The save activates an unknown warp: ${String(locationId)}.` };
+    }
+    if (!placedSet.has(locationId)) {
+      return { ok: false, error: `The save activates an unplaced warp: ${locationId}.` };
+    }
+    if (activatedWarpSet.has(locationId)) {
+      return { ok: false, error: `The save activates ${locationId} more than once.` };
+    }
+    activatedWarpSet.add(locationId);
+    activatedWarpLocationIds.push(locationId);
   }
 
   const positions: TrackerSave["positions"] = {};
@@ -209,6 +232,7 @@ function validateCurrentSave(
       placedLocationIds,
       positions,
       connections,
+      activatedWarpLocationIds,
       settings: {
         showMinimap: value.settings.showMinimap,
         defaultArrowMode,
@@ -298,6 +322,7 @@ function migratePrototypeSave(
       placedLocationIds: Object.keys(positions),
       positions,
       connections,
+      activatedWarpLocationIds: [],
       settings: {
         showMinimap: typeof oldSettings.showMinimap === "boolean"
           ? oldSettings.showMinimap
@@ -338,13 +363,14 @@ export function createTrackerSave(
   state: Pick<
     TrackerSave,
     "seedName" | "placedLocationIds" | "positions" | "connections" | "settings"
-  >,
+  > & Partial<Pick<TrackerSave, "activatedWarpLocationIds">>,
 ): TrackerSave {
   return {
     schemaVersion: TRACKER_SCHEMA_VERSION,
     trackerVersion: TRACKER_VERSION,
     savedAt: new Date().toISOString(),
     ...state,
+    activatedWarpLocationIds: state.activatedWarpLocationIds ?? [],
     settings: state.settings ?? { ...DEFAULT_SETTINGS },
   };
 }

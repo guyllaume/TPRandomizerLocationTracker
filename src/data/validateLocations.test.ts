@@ -26,4 +26,29 @@ describe("normalized location dataset", () => {
     expect(locationDataset).not.toHaveProperty("connections");
     expect(locationDataset).not.toHaveProperty("edges");
   });
+
+  it("marks every fixed Twilight Princess warp destination on its existing location", () => {
+    expect(
+      locationDataset.locations
+        .filter((location) => location.hasWarp)
+        .map((location) => location.id)
+        .sort(),
+    ).toEqual([
+      "death-mountain",
+      "eldin-field",
+      "gerudo-desert",
+      "kakariko-gorge",
+      "kakariko-village",
+      "lake-hylia",
+      "mirror-chamber",
+      "north-faron-woods",
+      "ordon-spring",
+      "sacred-grove",
+      "snowpeak-summit",
+      "south-faron-woods",
+      "upper-zora-s-river",
+      "west-castle-town-field",
+      "zora-throne-room",
+    ]);
+  });
 });

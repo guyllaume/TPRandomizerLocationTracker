@@ -36,7 +36,7 @@ Run schema v2 stores only user state:
 
 ```text
 schemaVersion, trackerVersion, seedName, savedAt,
-placedLocationIds, positions, connections, settings
+placedLocationIds, positions, connections, activatedWarpLocationIds, settings
 ```
 
 Browser state uses the localStorage key `tp-entrance-tracker:run:v2`. The loader can migrate an old v1 prototype save, preserving valid positions and connections where their IDs still exist and reporting obsolete references that were ignored. Invalid or corrupt current saves never crash the app. If localStorage is unavailable, the tracker remains usable and recommends **Export Run**.

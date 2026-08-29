@@ -19,18 +19,26 @@ import { LocationNode } from "./components/LocationNode";
 import { LocationPalette } from "./components/LocationPalette";
 import { TrackerEdge } from "./components/TrackerEdge";
 import { TrackerToolbar } from "./components/TrackerToolbar";
-import { entrancesById, locations, locationsById } from "./data/locations";
+import {
+  entranceDirectionsById,
+  entrancesById,
+  locations,
+  locationsById,
+} from "./data/locations";
 import { useTrackerPersistence } from "./hooks/useTrackerPersistence";
 import { DEFAULT_SETTINGS } from "./tracker/constants";
 import {
   buildEdges,
+  buildLocationGraph,
   buildNodes,
   connectionFromFlow,
   edgeToConnection,
   endpointsKey,
+  findShortestAccessibleWarpRoutes,
   getDirectlyConnectedLocations,
   positionsFromNodes,
   updateNodeConnectionData,
+  type AccessibleWarpRoute,
 } from "./tracker/graph";
 import {
   createTrackerSave,
@@ -49,6 +57,9 @@ import type {
 
 const nodeTypes: NodeTypes = { location: LocationNode };
 const edgeTypes: EdgeTypes = { tracker: TrackerEdge };
+const warpLocationIds = locations
+  .filter((location) => location.hasWarp)
+  .map((location) => location.id);
 
 function definitionsForIds(ids: string[]): LocationDefinition[] {
   return ids
@@ -65,18 +76,56 @@ function applyFocusState(
   nodes: LocationFlowNode[],
   edges: TrackerFlowEdge[],
   connections: TrackerConnection[],
+  accessibleLocationIds: ReadonlySet<string>,
+  warpRoutes: AccessibleWarpRoute[],
 ): { nodes: LocationFlowNode[]; edges: TrackerFlowEdge[] } {
   const selectedNode = nodes.find((node) => node.selected);
   if (!selectedNode) {
-    return { nodes, edges };
+    return {
+      nodes: nodes.map((node) => ({
+        ...node,
+        data: {
+          ...node.data,
+          accessible: accessibleLocationIds.has(node.id),
+          warpRouteEntranceIds: [],
+          focusState: undefined,
+        },
+      })),
+      edges: edges.map((edge) => ({
+        ...edge,
+        data: edge.data ? { ...edge.data, focusState: undefined } : edge.data,
+      })),
+    };
   }
 
   const relatedLocationIds = getDirectlyConnectedLocations(selectedNode.id, connections);
+  const routeLocationIds = new Set(warpRoutes.flatMap((route) => route.path));
+  const routeWarpLocationIds = new Set(
+    warpRoutes.filter((route) => route.distance > 0).map((route) => route.warpLocationId),
+  );
+  const routeConnectionIds = new Set(
+    warpRoutes.flatMap((route) => route.edges.map((edge) => edge.connectionId)),
+  );
+  const routeEntrancesByLocation = new Map<string, Set<string>>();
+  for (const route of warpRoutes) {
+    for (const edge of route.edges) {
+      const fromEntrances = routeEntrancesByLocation.get(edge.fromLocationId) ?? new Set<string>();
+      fromEntrances.add(edge.fromEntranceId);
+      routeEntrancesByLocation.set(edge.fromLocationId, fromEntrances);
+      const toEntrances = routeEntrancesByLocation.get(edge.toLocationId) ?? new Set<string>();
+      toEntrances.add(edge.toEntranceId);
+      routeEntrancesByLocation.set(edge.toLocationId, toEntrances);
+    }
+  }
 
   const updatedNodes = nodes.map((node) => {
-    let focusState: "selected" | "related" | "dimmed" | undefined;
+    let focusState: "selected" | "related" | "warp-route" | "warp-start" | "dimmed";
     if (node.id === selectedNode.id) {
       focusState = "selected";
+    } else if (routeWarpLocationIds.has(node.id)) {
+      focusState = "warp-start";
+    } else if (routeLocationIds.has(node.id)) {
+      focusState = "warp-route";
     } else if (relatedLocationIds.has(node.id)) {
       focusState = "related";
     } else {
@@ -87,6 +136,8 @@ function applyFocusState(
       ...node,
       data: {
         ...node.data,
+        accessible: accessibleLocationIds.has(node.id),
+        warpRouteEntranceIds: [...(routeEntrancesByLocation.get(node.id) ?? [])],
         focusState,
       },
     };
@@ -98,8 +149,10 @@ function applyFocusState(
     const sourceIsRelated = relatedLocationIds.has(edge.source);
     const targetIsRelated = relatedLocationIds.has(edge.target);
 
-    let focusState: "related" | "dimmed" | undefined;
-    if (
+    let focusState: "related" | "warp-route" | "dimmed";
+    if (routeConnectionIds.has(edge.id)) {
+      focusState = "warp-route";
+    } else if (
       (sourceIsSelected && targetIsRelated) ||
       (targetIsSelected && sourceIsRelated)
     ) {
@@ -143,6 +196,9 @@ export default function App() {
   const [settings, setSettings] = useState<TrackerSettings>(
     initial.save?.settings ?? { ...DEFAULT_SETTINGS },
   );
+  const [activatedWarpLocationIds, setActivatedWarpLocationIds] = useState<string[]>(
+    initial.save?.activatedWarpLocationIds ?? [],
+  );
   const [notice, setNotice] = useState(initial.notice ?? initial.error ?? "");
   const [storageWarning, setStorageWarning] = useState(
     initial.storageAvailable ? "" : initial.error ?? "Browser persistence is unavailable.",
@@ -155,6 +211,32 @@ export default function App() {
     () => edges.map(edgeToConnection).filter((item): item is TrackerConnection => item !== null),
     [edges],
   );
+  const placedLocationIds = useMemo(() => nodes.map((node) => node.id), [nodes]);
+  const placedLocationIdSet = useMemo(() => new Set(placedLocationIds), [placedLocationIds]);
+  const activatedWarpLocationIdSet = useMemo(
+    () => new Set(activatedWarpLocationIds),
+    [activatedWarpLocationIds],
+  );
+  const locationGraph = useMemo(
+    () => buildLocationGraph(connections, entranceDirectionsById),
+    [connections],
+  );
+  const accessibleLocationIds = activatedWarpLocationIdSet;
+  const selectedLocationId = useMemo(
+    () => nodes.find((node) => node.selected)?.id,
+    [nodes],
+  );
+  const warpRoutes = useMemo(
+    () => selectedLocationId
+      ? findShortestAccessibleWarpRoutes(
+          locationGraph,
+          selectedLocationId,
+          warpLocationIds,
+          accessibleLocationIds,
+        )
+      : [],
+    [accessibleLocationIds, locationGraph, selectedLocationId],
+  );
   const selectedConnection = useMemo(() => {
     const selectedEdge = edges.find((edge) => edge.selected);
     return selectedEdge ? edgeToConnection(selectedEdge) : null;
@@ -163,9 +245,17 @@ export default function App() {
     ? entrancesById.get(selectedConnection.sourceEntranceId)?.entrance.direction !== "both" ||
       entrancesById.get(selectedConnection.targetEntranceId)?.entrance.direction !== "both"
     : false;
-  const placedLocationIds = useMemo(() => nodes.map((node) => node.id), [nodes]);
-  const placedLocationIdSet = useMemo(() => new Set(placedLocationIds), [placedLocationIds]);
   const positions = useMemo(() => positionsFromNodes(nodes), [nodes]);
+
+  const toggleWarp = useCallback((locationId: string) => {
+    const location = locationsById.get(locationId);
+    if (!location?.hasWarp) return;
+    setActivatedWarpLocationIds((current) =>
+      current.includes(locationId)
+        ? current.filter((id) => id !== locationId)
+        : [...current, locationId].sort(),
+    );
+  }, []);
 
   const removeLocation = useCallback((locationId: string) => {
     if (connections.some((connection) =>
@@ -175,17 +265,24 @@ export default function App() {
       return;
     }
     setNodes((currentNodes) => currentNodes.filter((node) => node.id !== locationId));
+    setActivatedWarpLocationIds((current) => current.filter((id) => id !== locationId));
     setNotice("Location removed from the canvas. Its static definition remains in the palette.");
   }, [connections, setNodes]);
 
   const nodesWithConnectionData = useMemo(
-    () => updateNodeConnectionData(nodes, connections, removeLocation),
-    [connections, nodes, removeLocation],
+    () => updateNodeConnectionData(nodes, connections, removeLocation, toggleWarp),
+    [connections, nodes, removeLocation, toggleWarp],
   );
 
   const { nodes: displayNodes, edges: displayEdges } = useMemo(
-    () => applyFocusState(nodesWithConnectionData, edges, connections),
-    [connections, edges, nodesWithConnectionData],
+    () => applyFocusState(
+      nodesWithConnectionData,
+      edges,
+      connections,
+      accessibleLocationIds,
+      warpRoutes,
+    ),
+    [accessibleLocationIds, connections, edges, nodesWithConnectionData, warpRoutes],
   );
 
   const persistenceState = useMemo(
@@ -194,9 +291,10 @@ export default function App() {
       placedLocationIds,
       positions,
       connections,
+      activatedWarpLocationIds,
       settings,
     }),
-    [seedName, placedLocationIds, positions, connections, settings],
+    [activatedWarpLocationIds, seedName, placedLocationIds, positions, connections, settings],
   );
 
   const handleStorageError = useCallback((message: string) => setStorageWarning(message), []);
@@ -337,6 +435,7 @@ export default function App() {
       ));
       setEdges(buildEdges(result.save.connections));
       setSeedName(result.save.seedName ?? "");
+      setActivatedWarpLocationIds(result.save.activatedWarpLocationIds);
       setSettings(result.save.settings);
       setNotice(result.warnings.length > 0
         ? `Run imported. ${result.warnings.join(" ")}`
@@ -355,6 +454,7 @@ export default function App() {
     setNodes([]);
     setEdges([]);
     setSeedName("");
+    setActivatedWarpLocationIds([]);
     setSettings({ ...DEFAULT_SETTINGS });
     setNotice("Run reset. The canvas has no locations or connections.");
   }, [setEdges, setNodes]);
@@ -398,6 +498,7 @@ export default function App() {
         <LocationPalette
           locations={locations}
           placedLocationIds={placedLocationIdSet}
+          activatedWarpLocationIds={activatedWarpLocationIdSet}
           hidePlaced={settings.hidePlacedLocations}
           onHidePlacedChange={(hidePlacedLocations) =>
             setSettings((current) => ({ ...current, hidePlacedLocations }))

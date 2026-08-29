@@ -18,3 +18,9 @@ export const entrancesById = new Map(
     ] as const),
   ),
 );
+
+export const entranceDirectionsById = new Map(
+  locations.flatMap((location) =>
+    location.entrances.map((entrance) => [entrance.id, entrance.direction] as const),
+  ),
+);

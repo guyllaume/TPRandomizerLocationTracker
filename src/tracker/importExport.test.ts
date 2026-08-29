@@ -6,10 +6,11 @@ import { createTrackerSave, exportFilename, parseTrackerSave, validateTrackerSav
 function validSave(): TrackerSave {
   return createTrackerSave({
     seedName: "Seed 473829",
-    placedLocationIds: ["coro-s-house", "link-s-house"],
+    placedLocationIds: ["coro-s-house", "link-s-house", "kakariko-village"],
     positions: {
       "coro-s-house": { x: 10, y: 20 },
       "link-s-house": { x: 300, y: 400 },
+      "kakariko-village": { x: 600, y: 100 },
     },
     connections: [{
       id: "connection-1",
@@ -20,6 +21,7 @@ function validSave(): TrackerSave {
       direction: "discovered",
       arrowMode: "forward",
     }],
+    activatedWarpLocationIds: ["kakariko-village"],
     settings: {
       showMinimap: true,
       defaultArrowMode: "forward",
@@ -48,6 +50,7 @@ describe("tracker save validation", () => {
     delete olderSave.connections[0].arrowMode;
     delete olderSave.settings.defaultArrowMode;
     delete olderSave.settings.hidePlacedLocations;
+    delete (olderSave as Record<string, unknown>).activatedWarpLocationIds;
 
     const result = validateTrackerSave(olderSave, locations);
     expect(result.ok).toBe(true);
@@ -55,6 +58,7 @@ describe("tracker save validation", () => {
       expect(result.save.connections[0].arrowMode).toBe("forward");
       expect(result.save.settings.defaultArrowMode).toBe("forward");
       expect(result.save.settings.hidePlacedLocations).toBe(false);
+      expect(result.save.activatedWarpLocationIds).toEqual([]);
     }
   });
 
@@ -84,6 +88,7 @@ describe("tracker save validation", () => {
       expect(result.save.schemaVersion).toBe(2);
       expect(result.save.placedLocationIds).toEqual(["kakariko-village"]);
       expect(result.save.connections).toEqual([]);
+      expect(result.save.activatedWarpLocationIds).toEqual([]);
       expect(result.warnings.join(" ")).toContain("obsolete connection");
     }
   });
@@ -111,6 +116,7 @@ describe("tracker save validation", () => {
       "sacred-grove-past": { x: 0, y: 0 },
       "coro-s-house": { x: 300, y: 0 },
     };
+    save.activatedWarpLocationIds = [];
     save.connections[0] = {
       id: "bad-direction",
       sourceLocationId: "sacred-grove-past",
@@ -141,6 +147,20 @@ describe("tracker save validation", () => {
     const result = validateTrackerSave(save, locations);
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error).toContain("duplicates another connection");
+  });
+
+  it("rejects activated portals that are not placed warp locations", () => {
+    const unplaced = validSave();
+    unplaced.activatedWarpLocationIds = ["lake-hylia"];
+    const unplacedResult = validateTrackerSave(unplaced, locations);
+    expect(unplacedResult.ok).toBe(false);
+    if (!unplacedResult.ok) expect(unplacedResult.error).toContain("unplaced warp");
+
+    const notAWarp = validSave();
+    notAWarp.activatedWarpLocationIds = ["coro-s-house"];
+    const notAWarpResult = validateTrackerSave(notAWarp, locations);
+    expect(notAWarpResult.ok).toBe(false);
+    if (!notAWarpResult.ok) expect(notAWarpResult.error).toContain("unknown warp");
   });
 
   it("builds a safe export filename", () => {

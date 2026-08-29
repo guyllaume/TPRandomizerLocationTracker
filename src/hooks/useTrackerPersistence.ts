@@ -6,7 +6,8 @@ import { writeStoredTracker } from "../tracker/persistence";
 export function useTrackerPersistence(
   state: Pick<
     TrackerSave,
-    "seedName" | "placedLocationIds" | "positions" | "connections" | "settings"
+    "seedName" | "placedLocationIds" | "positions" | "connections" |
+    "activatedWarpLocationIds" | "settings"
   >,
   onStorageError: (message: string) => void,
 ): void {
