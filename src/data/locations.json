@@ -209,6 +209,7 @@
     {
       "id": "ordon-spring",
       "name": "Ordon Spring",
+      "hasWarp": true,
       "locationKind": "overworld",
       "primaryGroup": "Ordona Province",
       "sourceSheets": [
@@ -448,6 +449,7 @@
     {
       "id": "south-faron-woods",
       "name": "South Faron Woods",
+      "hasWarp": true,
       "locationKind": "overworld",
       "primaryGroup": "Faron Province",
       "sourceSheets": [
@@ -1206,6 +1208,7 @@
     {
       "id": "north-faron-woods",
       "name": "North Faron Woods",
+      "hasWarp": true,
       "locationKind": "overworld",
       "primaryGroup": "Faron Province",
       "sourceSheets": [
@@ -1554,6 +1557,7 @@
     {
       "id": "sacred-grove",
       "name": "Sacred Grove",
+      "hasWarp": true,
       "locationKind": "overworld",
       "primaryGroup": "Faron Province",
       "sourceSheets": [
@@ -1740,6 +1744,7 @@
     {
       "id": "kakariko-gorge",
       "name": "Kakariko Gorge",
+      "hasWarp": true,
       "locationKind": "overworld",
       "primaryGroup": "Eldin Province",
       "sourceSheets": [
@@ -1874,6 +1879,7 @@
     {
       "id": "kakariko-village",
       "name": "Kakariko Village",
+      "hasWarp": true,
       "locationKind": "overworld",
       "primaryGroup": "Eldin Province",
       "sourceSheets": [
@@ -2387,6 +2393,7 @@
     {
       "id": "death-mountain",
       "name": "Death Mountain",
+      "hasWarp": true,
       "locationKind": "overworld",
       "primaryGroup": "Eldin Province",
       "sourceSheets": [
@@ -2680,6 +2687,7 @@
     {
       "id": "lake-hylia",
       "name": "Lake Hylia",
+      "hasWarp": true,
       "locationKind": "overworld",
       "primaryGroup": "Lanayru Province",
       "sourceSheets": [
@@ -2956,6 +2964,7 @@
     {
       "id": "eldin-field",
       "name": "Eldin Field",
+      "hasWarp": true,
       "locationKind": "overworld",
       "primaryGroup": "Eldin Province",
       "sourceSheets": [
@@ -3740,6 +3749,7 @@
     {
       "id": "west-castle-town-field",
       "name": "West Castle Town Field",
+      "hasWarp": true,
       "locationKind": "overworld",
       "primaryGroup": "Lanayru Province",
       "sourceSheets": [
@@ -3967,6 +3977,7 @@
     {
       "id": "zora-throne-room",
       "name": "Zora's Throne Room",
+      "hasWarp": true,
       "locationKind": "overworld",
       "primaryGroup": "Lanayru Province",
       "sourceSheets": [
@@ -5258,6 +5269,7 @@
     {
       "id": "gerudo-desert",
       "name": "Gerudo Desert",
+      "hasWarp": true,
       "locationKind": "overworld",
       "primaryGroup": "Desert Province",
       "sourceSheets": [
@@ -5383,6 +5395,7 @@
     {
       "id": "upper-zora-s-river",
       "name": "Upper Zora's River",
+      "hasWarp": true,
       "locationKind": "overworld",
       "primaryGroup": "Lanayru Province",
       "sourceSheets": [
@@ -5940,6 +5953,7 @@
     {
       "id": "mirror-chamber",
       "name": "Mirror Chamber",
+      "hasWarp": true,
       "locationKind": "interior",
       "primaryGroup": "Desert Province",
       "sourceSheets": [
@@ -6064,6 +6078,7 @@
     {
       "id": "snowpeak-summit",
       "name": "Snowpeak Summit",
+      "hasWarp": true,
       "locationKind": "overworld",
       "primaryGroup": "Peak Province",
       "sourceSheets": [

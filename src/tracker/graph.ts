@@ -1,11 +1,29 @@
 import { MarkerType, type Connection, type XYPosition } from "@xyflow/react";
 import type {
   ArrowMode,
+  EntranceDirection,
   LocationDefinition,
   LocationFlowNode,
   TrackerConnection,
   TrackerFlowEdge,
 } from "../types/tracker";
+
+export interface LocationGraphEdge {
+  connectionId: string;
+  fromLocationId: string;
+  fromEntranceId: string;
+  toLocationId: string;
+  toEntranceId: string;
+}
+
+export type LocationGraph = Map<string, LocationGraphEdge[]>;
+
+export interface AccessibleWarpRoute {
+  warpLocationId: string;
+  distance: number;
+  path: string[];
+  edges: LocationGraphEdge[];
+}
 
 export function buildNodes(
   definitions: LocationDefinition[],
@@ -24,6 +42,8 @@ export function buildNodes(
     data: {
       location,
       connectedEntranceIds: [...(connectedByLocation.get(location.id) ?? [])],
+      accessible: false,
+      warpRouteEntranceIds: [],
     },
     deletable: false,
   }));
@@ -101,6 +121,7 @@ export function updateNodeConnectionData(
   nodes: LocationFlowNode[],
   connections: TrackerConnection[],
   onRemoveLocation?: (locationId: string) => void,
+  onToggleWarp?: (locationId: string) => void,
 ): LocationFlowNode[] {
   const connectedByLocation = connectedEntrancesByLocation(connections);
   return nodes.map((node) => ({
@@ -109,6 +130,7 @@ export function updateNodeConnectionData(
       ...node.data,
       connectedEntranceIds: [...(connectedByLocation.get(node.id) ?? [])],
       onRemoveLocation,
+      onToggleWarp,
     },
   }));
 }
@@ -155,4 +177,156 @@ export function getDirectlyConnectedLocations(
     }
   }
   return related;
+}
+
+function addGraphEdge(graph: LocationGraph, edge: LocationGraphEdge): void {
+  const outgoing = graph.get(edge.fromLocationId) ?? [];
+  outgoing.push(edge);
+  graph.set(edge.fromLocationId, outgoing);
+}
+
+/**
+ * Builds the currently known directed location graph. Dataset entrance
+ * directions are the traversal rule; unresolved entrances have no
+ * TrackerConnection and therefore never appear here.
+ */
+export function buildLocationGraph(
+  connections: TrackerConnection[],
+  entranceDirectionsById?: ReadonlyMap<string, EntranceDirection>,
+): LocationGraph {
+  const graph: LocationGraph = new Map();
+
+  for (const connection of connections) {
+    const forward: LocationGraphEdge = {
+      connectionId: connection.id,
+      fromLocationId: connection.sourceLocationId,
+      fromEntranceId: connection.sourceEntranceId,
+      toLocationId: connection.targetLocationId,
+      toEntranceId: connection.targetEntranceId,
+    };
+    const reverse: LocationGraphEdge = {
+      connectionId: connection.id,
+      fromLocationId: connection.targetLocationId,
+      fromEntranceId: connection.targetEntranceId,
+      toLocationId: connection.sourceLocationId,
+      toEntranceId: connection.sourceEntranceId,
+    };
+
+    const sourceDirection = entranceDirectionsById?.get(connection.sourceEntranceId);
+    const targetDirection = entranceDirectionsById?.get(connection.targetEntranceId);
+    const hasDatasetDirections = sourceDirection !== undefined && targetDirection !== undefined;
+    const isTwoWayEntrancePair = sourceDirection === "both" && targetDirection === "both";
+
+    // arrowMode controls presentation. Dataset entrance directions control
+    // traversal whenever they are available. The fallback keeps this helper
+    // useful for standalone/synthetic graphs.
+    if (hasDatasetDirections) {
+      addGraphEdge(graph, forward);
+      if (isTwoWayEntrancePair) addGraphEdge(graph, reverse);
+    } else {
+      if (connection.arrowMode !== "reverse") addGraphEdge(graph, forward);
+      if (connection.arrowMode !== "forward") addGraphEdge(graph, reverse);
+    }
+  }
+
+  for (const outgoing of graph.values()) {
+    outgoing.sort((left, right) =>
+      left.toLocationId.localeCompare(right.toLocationId) ||
+      left.connectionId.localeCompare(right.connectionId),
+    );
+  }
+  return graph;
+}
+
+/** Returns every location reachable from any supplied player start node. */
+export function findReachableLocationIds(
+  graph: LocationGraph,
+  startingLocationIds: Iterable<string>,
+): Set<string> {
+  const reachable = new Set<string>();
+  const queue = [...new Set(startingLocationIds)].sort();
+
+  for (const locationId of queue) reachable.add(locationId);
+  for (let index = 0; index < queue.length; index += 1) {
+    const current = queue[index];
+    for (const edge of graph.get(current) ?? []) {
+      if (reachable.has(edge.toLocationId)) continue;
+      reachable.add(edge.toLocationId);
+      queue.push(edge.toLocationId);
+    }
+  }
+  return reachable;
+}
+
+/**
+ * Finds every accessible warp tied for the fewest directed transitions to the
+ * selected location. One reverse BFS supplies distances and a stable path for
+ * all candidate warps.
+ */
+export function findShortestAccessibleWarpRoutes(
+  graph: LocationGraph,
+  selectedLocationId: string,
+  warpLocationIds: Iterable<string>,
+  accessibleLocationIds: ReadonlySet<string>,
+): AccessibleWarpRoute[] {
+  const accessibleWarps = [...new Set(warpLocationIds)]
+    .filter((locationId) => accessibleLocationIds.has(locationId))
+    .sort();
+  if (accessibleWarps.length === 0) return [];
+
+  const reverseGraph: LocationGraph = new Map();
+  for (const outgoing of graph.values()) {
+    for (const edge of outgoing) {
+      const incoming = reverseGraph.get(edge.toLocationId) ?? [];
+      incoming.push(edge);
+      reverseGraph.set(edge.toLocationId, incoming);
+    }
+  }
+  for (const incoming of reverseGraph.values()) {
+    incoming.sort((left, right) =>
+      left.fromLocationId.localeCompare(right.fromLocationId) ||
+      left.connectionId.localeCompare(right.connectionId),
+    );
+  }
+
+  const distanceByLocation = new Map<string, number>([[selectedLocationId, 0]]);
+  const nextEdgeByLocation = new Map<string, LocationGraphEdge>();
+  const queue = [selectedLocationId];
+  for (let index = 0; index < queue.length; index += 1) {
+    const current = queue[index];
+    const currentDistance = distanceByLocation.get(current) ?? 0;
+    for (const edge of reverseGraph.get(current) ?? []) {
+      if (distanceByLocation.has(edge.fromLocationId)) continue;
+      distanceByLocation.set(edge.fromLocationId, currentDistance + 1);
+      nextEdgeByLocation.set(edge.fromLocationId, edge);
+      queue.push(edge.fromLocationId);
+    }
+  }
+
+  const candidates = accessibleWarps
+    .map((warpLocationId) => ({
+      warpLocationId,
+      distance: distanceByLocation.get(warpLocationId),
+    }))
+    .filter((candidate): candidate is { warpLocationId: string; distance: number } =>
+      candidate.distance !== undefined,
+    );
+  if (candidates.length === 0) return [];
+
+  const shortestDistance = Math.min(...candidates.map((candidate) => candidate.distance));
+  return candidates
+    .filter((candidate) => candidate.distance === shortestDistance)
+    .map(({ warpLocationId, distance }) => {
+      const path = [warpLocationId];
+      const edges: LocationGraphEdge[] = [];
+      let current = warpLocationId;
+      while (current !== selectedLocationId) {
+        const edge = nextEdgeByLocation.get(current);
+        if (!edge) break;
+        edges.push(edge);
+        current = edge.toLocationId;
+        path.push(current);
+      }
+      return { warpLocationId, distance, path, edges };
+    });
 }

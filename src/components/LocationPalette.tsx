@@ -1,9 +1,12 @@
 import { memo, useMemo, useState } from "react";
+import greenWarpIcon from "../../icons/ezgif-482ef2a92ce44a3f.png";
+import redWarpIcon from "../../icons/ezgif-4cc6456631015bee.png";
 import type { LocationDefinition } from "../types/tracker";
 
 interface LocationPaletteProps {
   locations: LocationDefinition[];
   placedLocationIds: Set<string>;
+  activatedWarpLocationIds: ReadonlySet<string>;
   hidePlaced: boolean;
   onHidePlacedChange: (hide: boolean) => void;
   onAddLocation: (locationId: string) => void;
@@ -12,6 +15,7 @@ interface LocationPaletteProps {
 function LocationPaletteComponent({
   locations,
   placedLocationIds,
+  activatedWarpLocationIds,
   hidePlaced,
   onHidePlacedChange,
   onAddLocation,
@@ -89,7 +93,17 @@ function LocationPaletteComponent({
                     >
                       <span className="palette-add-mark">{placed ? "✓" : "+"}</span>
                       <span>
-                        <strong>{location.name}</strong>
+                        <span className="palette-location-name">
+                          <strong>{location.name}</strong>
+                          {location.hasWarp && (
+                            <img
+                              className="palette-warp-icon"
+                              src={activatedWarpLocationIds.has(location.id) ? greenWarpIcon : redWarpIcon}
+                              alt={activatedWarpLocationIds.has(location.id) ? "Active warp" : "Inactive warp"}
+                              title={activatedWarpLocationIds.has(location.id) ? "Active warp" : "Inactive warp"}
+                            />
+                          )}
+                        </span>
                         {matchingEntrances.length > 0 &&
                           !location.name.toLocaleLowerCase().includes(normalizedQuery) && (
                             <small>{matchingEntrances.map((entrance) => entrance.name).join(", ")}</small>

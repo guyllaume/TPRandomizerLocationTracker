@@ -19,6 +19,8 @@
   --danger-soft: #fee4e2;
   --warning: #8a4b08;
   --warning-soft: #fffaeb;
+  --warp-route: #087f5b;
+  --warp-route-soft: #d3f9d8;
   --shadow: 0 12px 32px rgb(16 24 40 / 12%);
   --minimap-node: #15705f;
   --minimap-mask: rgb(238 241 245 / 72%);
@@ -360,6 +362,20 @@ select:focus-visible,
 .palette-group strong,
 .palette-group small { display: block; }
 
+.palette-location-name {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 5px;
+}
+
+.palette-warp-icon {
+  flex: 0 0 17px;
+  width: 17px;
+  height: 17px;
+  object-fit: contain;
+}
+
 .palette-group strong {
   font-size: 0.74rem;
   line-height: 1.25;
@@ -446,6 +462,18 @@ select:focus-visible,
   opacity: 1;
 }
 
+.location-node.is-warp-route {
+  opacity: 1;
+  border-color: var(--warp-route);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--warp-route) 18%, transparent), var(--shadow);
+}
+
+.location-node.is-warp-start {
+  opacity: 1;
+  border-color: var(--warp-route);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--warp-route) 30%, transparent), var(--shadow);
+}
+
 .location-node.is-dimmed {
   opacity: 0.15;
 }
@@ -511,6 +539,44 @@ select:focus-visible,
   font-weight: 800;
   background: var(--accent-soft);
   border-radius: 999px;
+}
+
+.location-status {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 7px;
+}
+
+.warp-icon {
+  width: 25px;
+  height: 25px;
+  object-fit: contain;
+  image-rendering: auto;
+}
+
+.warp-toggle {
+  display: grid;
+  flex: 0 0 29px;
+  width: 29px;
+  height: 29px;
+  padding: 2px;
+  place-items: center;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.warp-toggle:hover,
+.warp-toggle:focus-visible {
+  background: color-mix(in srgb, var(--warp-route-soft) 72%, transparent);
+  border-color: color-mix(in srgb, var(--warp-route) 45%, transparent);
+}
+
+.location-node.is-warp-start .warp-icon {
+  filter: drop-shadow(0 0 5px color-mix(in srgb, var(--warp-route) 75%, transparent));
+  transform: scale(1.12);
 }
 
 .remove-location {
@@ -608,6 +674,11 @@ select:focus-visible,
 .entrance-row.is-connected .entrance-name,
 .entrance-row.is-connected .entrance-type-badge {
   color: var(--accent);
+}
+
+.entrance-row.is-warp-route {
+  background: color-mix(in srgb, var(--warp-route-soft) 72%, transparent);
+  box-shadow: inset 3px 0 0 var(--warp-route);
 }
 
 .empty-canvas {
@@ -793,6 +864,8 @@ select:focus-visible,
     --danger-soft: #4b2020;
     --warning: #f5bd66;
     --warning-soft: #3d2f18;
+    --warp-route: #63e6be;
+    --warp-route-soft: #163c32;
     --shadow: 0 14px 34px rgb(0 0 0 / 32%);
     --minimap-node: #35b99a;
     --minimap-mask: rgb(13 17 23 / 74%);

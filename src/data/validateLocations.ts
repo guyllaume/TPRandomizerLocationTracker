@@ -39,6 +39,9 @@ export function validateLocationDataset(dataset: LocationDataset): DatasetValida
   for (const location of dataset.locations) {
     if (locationIds.has(location.id)) errors.push(`Duplicate location ID: ${location.id}.`);
     locationIds.add(location.id);
+    if (location.hasWarp !== undefined && location.hasWarp !== true) {
+      errors.push(`Invalid warp flag on ${location.id}.`);
+    }
     if (location.entrances.length === 0) {
       errors.push(`Location ${location.id} does not contain an entrance.`);
     }

@@ -5,6 +5,7 @@ import type { EntranceDefinition } from "../types/tracker";
 interface EntranceHandleProps {
   entrance: EntranceDefinition;
   connected: boolean;
+  onWarpRoute?: boolean;
 }
 
 const TYPE_LABELS: Record<EntranceDefinition["type"], string> = {
@@ -17,7 +18,7 @@ const TYPE_LABELS: Record<EntranceDefinition["type"], string> = {
   "boss-room": "Boss",
 };
 
-function EntranceHandleComponent({ entrance, connected }: EntranceHandleProps) {
+function EntranceHandleComponent({ entrance, connected, onWarpRoute = false }: EntranceHandleProps) {
   const directionLabel = entrance.direction === "out"
     ? "Outgoing only"
     : entrance.direction === "in"
@@ -28,7 +29,7 @@ function EntranceHandleComponent({ entrance, connected }: EntranceHandleProps) {
 
   return (
     <div
-      className={`entrance-row nodrag nopan ${connected ? "is-connected" : ""}`}
+      className={`entrance-row nodrag nopan ${connected ? "is-connected" : ""} ${onWarpRoute ? "is-warp-route" : ""}`.trim()}
       title={`${entrance.name} · ${details}`}
     >
       <span className="entrance-type-dot" data-type={entrance.type} aria-hidden="true" />

@@ -39,6 +39,7 @@ export interface EntranceDefinition {
 export interface LocationDefinition {
   id: string;
   name: string;
+  hasWarp?: boolean;
   locationKind: LocationKind;
   primaryGroup: string;
   sourceSheets?: string[];
@@ -92,15 +93,22 @@ export interface TrackerSave {
   placedLocationIds: string[];
   positions: Record<string, XYPosition>;
   connections: TrackerConnection[];
+  activatedWarpLocationIds: string[];
   settings: TrackerSettings;
 }
 
 export interface LocationNodeData extends Record<string, unknown> {
   location: LocationDefinition;
   connectedEntranceIds: string[];
-  focusState?: "selected" | "related" | "dimmed";
+  accessible: boolean;
+  warpRouteEntranceIds: string[];
+  focusState?: "selected" | "related" | "warp-route" | "warp-start" | "dimmed";
   onRemoveLocation?: (locationId: string) => void;
+  onToggleWarp?: (locationId: string) => void;
 }
 
 export type LocationFlowNode = Node<LocationNodeData, "location">;
-export type TrackerFlowEdge = Edge<{ connection: TrackerConnection; focusState?: "related" | "dimmed" }, "tracker">;
+export type TrackerFlowEdge = Edge<{
+  connection: TrackerConnection;
+  focusState?: "related" | "warp-route" | "dimmed";
+}, "tracker">;
