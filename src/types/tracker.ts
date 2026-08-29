@@ -98,8 +98,9 @@ export interface TrackerSave {
 export interface LocationNodeData extends Record<string, unknown> {
   location: LocationDefinition;
   connectedEntranceIds: string[];
+  focusState?: "selected" | "related" | "dimmed";
   onRemoveLocation?: (locationId: string) => void;
 }
 
 export type LocationFlowNode = Node<LocationNodeData, "location">;
-export type TrackerFlowEdge = Edge<{ connection: TrackerConnection }, "tracker">;
+export type TrackerFlowEdge = Edge<{ connection: TrackerConnection; focusState?: "related" | "dimmed" }, "tracker">;

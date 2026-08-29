@@ -137,3 +137,22 @@ export function endpointsKey(connection: Omit<TrackerConnection, "id" | "directi
   ].sort();
   return endpoints.join("<->");
 }
+
+export function getDirectlyConnectedLocations(
+  selectedLocationId: string,
+  connections: TrackerConnection[],
+): Set<string> {
+  const related = new Set<string>();
+  for (const connection of connections) {
+    if (connection.sourceLocationId === selectedLocationId) {
+      if (connection.targetLocationId !== selectedLocationId) {
+        related.add(connection.targetLocationId);
+      }
+    } else if (connection.targetLocationId === selectedLocationId) {
+      if (connection.sourceLocationId !== selectedLocationId) {
+        related.add(connection.sourceLocationId);
+      }
+    }
+  }
+  return related;
+}
