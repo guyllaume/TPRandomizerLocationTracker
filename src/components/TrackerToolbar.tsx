@@ -1,6 +1,7 @@
 import type { ChangeEvent, RefObject } from "react";
 import type { LocationSearchItem } from "../tracker/locationSearch";
 import type { ArrowMode } from "../types/tracker";
+import tpRandomizerMainIcon from "../../icons/TPrandomizerMainIcon.jpg";
 import { LocationQuickJump } from "./LocationQuickJump";
 
 interface TrackerToolbarProps {
@@ -43,7 +44,9 @@ export function TrackerToolbar({
   return (
     <header className="tracker-toolbar">
       <div className="brand">
-        <div className="brand-mark" aria-hidden="true">TP</div>
+        <div className="brand-mark" aria-hidden="true">
+          <img src={tpRandomizerMainIcon} alt="Twilight Princess Randomizer logo" />
+        </div>
         <div>
           <h1>Entrance Tracker</h1>
           <p>{connectionCount} discovered connection{connectionCount === 1 ? "" : "s"}</p>
