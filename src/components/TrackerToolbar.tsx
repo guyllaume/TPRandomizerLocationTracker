@@ -1,13 +1,18 @@
 import type { ChangeEvent, RefObject } from "react";
+import type { LocationSearchItem } from "../tracker/locationSearch";
 import type { ArrowMode } from "../types/tracker";
+import { LocationQuickJump } from "./LocationQuickJump";
 
 interface TrackerToolbarProps {
   seedName: string;
+  locations: readonly LocationSearchItem[];
+  placedLocationIds: ReadonlySet<string>;
   connectionCount: number;
   showMinimap: boolean;
   defaultArrowMode: ArrowMode;
   importInputRef: RefObject<HTMLInputElement | null>;
   onSeedNameChange: (value: string) => void;
+  onSelectLocation: (locationId: string) => void;
   onExport: () => void;
   onImportClick: () => void;
   onImportFile: (event: ChangeEvent<HTMLInputElement>) => void;
@@ -19,11 +24,14 @@ interface TrackerToolbarProps {
 
 export function TrackerToolbar({
   seedName,
+  locations,
+  placedLocationIds,
   connectionCount,
   showMinimap,
   defaultArrowMode,
   importInputRef,
   onSeedNameChange,
+  onSelectLocation,
   onExport,
   onImportClick,
   onImportFile,
@@ -41,6 +49,12 @@ export function TrackerToolbar({
           <p>{connectionCount} discovered connection{connectionCount === 1 ? "" : "s"}</p>
         </div>
       </div>
+
+      <LocationQuickJump
+        locations={locations}
+        includedLocationIds={placedLocationIds}
+        onSelectLocation={onSelectLocation}
+      />
 
       <label className="seed-field">
         <span>Run name</span>
