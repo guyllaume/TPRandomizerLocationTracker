@@ -18,6 +18,13 @@ const locations = [
 ];
 
 describe("location search", () => {
+  it("continues to index and find a location carrying cleared player state", () => {
+    const items = [{ id: "grotto", name: "Faron Field Grotto", cleared: true }];
+    const index = createLocationSearchIndex(items);
+
+    expect(searchLocationIndex(index, "faron").map((item) => item.id)).toEqual(["grotto"]);
+  });
+
   const index = createLocationSearchIndex(locations);
 
   it("matches partial names without case or surrounding-whitespace sensitivity", () => {

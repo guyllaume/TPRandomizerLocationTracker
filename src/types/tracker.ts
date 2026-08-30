@@ -91,6 +91,7 @@ export interface TrackerSave {
   seedName?: string;
   savedAt: string;
   placedLocationIds: string[];
+  clearedLocationIds: string[];
   positions: Record<string, XYPosition>;
   connections: TrackerConnection[];
   activatedWarpLocationIds: string[];
@@ -101,9 +102,12 @@ export interface LocationNodeData extends Record<string, unknown> {
   location: LocationDefinition;
   connectedEntranceIds: string[];
   accessible: boolean;
+  cleared: boolean;
+  presentation: "expanded" | "minimized";
   warpRouteEntranceIds: string[];
   focusState?: "selected" | "related" | "warp-route" | "warp-destination" | "dimmed";
   onRemoveLocation?: (locationId: string) => void;
+  onToggleCleared?: (locationId: string) => void;
   onToggleWarp?: (locationId: string) => void;
 }
 

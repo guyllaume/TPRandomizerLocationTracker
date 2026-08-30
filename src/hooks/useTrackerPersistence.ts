@@ -7,7 +7,7 @@ export function useTrackerPersistence(
   state: Pick<
     TrackerSave,
     "seedName" | "placedLocationIds" | "positions" | "connections" |
-    "activatedWarpLocationIds" | "settings"
+    "activatedWarpLocationIds" | "clearedLocationIds" | "settings"
   >,
   onStorageError: (message: string) => void,
 ): void {

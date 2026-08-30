@@ -40,4 +40,25 @@ describe("tracker persistence", () => {
     });
     expect(result.ok).toBe(false);
   });
+
+  it("persists and reloads cleared location state", () => {
+    const save = createTrackerSave({
+      placedLocationIds: ["coro-s-house"],
+      clearedLocationIds: ["coro-s-house"],
+      positions: { "coro-s-house": { x: 12, y: 34 } },
+      connections: [],
+      settings: {
+        showMinimap: false,
+        defaultArrowMode: "forward",
+        hidePlacedLocations: false,
+      },
+    });
+    let stored = "";
+
+    expect(writeStoredTracker(save, { setItem: (_key, value) => { stored = value; } })).toEqual({
+      ok: true,
+    });
+    const result = readStoredTracker(locations, { getItem: () => stored });
+    expect(result.save?.clearedLocationIds).toEqual(["coro-s-house"]);
+  });
 });
