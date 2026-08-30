@@ -558,7 +558,7 @@ select:focus-visible,
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--warp-route) 18%, transparent), var(--shadow);
 }
 
-.location-node.is-warp-start {
+.location-node.is-warp-destination {
   opacity: 1;
   border-color: var(--warp-route);
   box-shadow: 0 0 0 4px color-mix(in srgb, var(--warp-route) 30%, transparent), var(--shadow);
@@ -664,7 +664,7 @@ select:focus-visible,
   border-color: color-mix(in srgb, var(--warp-route) 45%, transparent);
 }
 
-.location-node.is-warp-start .warp-icon {
+.location-node.is-warp-destination .warp-icon {
   filter: drop-shadow(0 0 5px color-mix(in srgb, var(--warp-route) 75%, transparent));
   transform: scale(1.12);
 }

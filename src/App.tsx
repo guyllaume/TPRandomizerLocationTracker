@@ -120,11 +120,11 @@ function applyFocusState(
   }
 
   const updatedNodes = nodes.map((node) => {
-    let focusState: "selected" | "related" | "warp-route" | "warp-start" | "dimmed";
+    let focusState: "selected" | "related" | "warp-route" | "warp-destination" | "dimmed";
     if (node.id === selectedNode.id) {
       focusState = "selected";
     } else if (routeWarpLocationIds.has(node.id)) {
-      focusState = "warp-start";
+      focusState = "warp-destination";
     } else if (routeLocationIds.has(node.id)) {
       focusState = "warp-route";
     } else if (relatedLocationIds.has(node.id)) {
