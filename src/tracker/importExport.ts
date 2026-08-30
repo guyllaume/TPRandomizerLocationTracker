@@ -179,6 +179,26 @@ function validateCurrentSave(
     activatedWarpLocationIds.push(locationId);
   }
 
+  const rawClearedLocationIds = value.clearedLocationIds ?? [];
+  if (!Array.isArray(rawClearedLocationIds)) {
+    return { ok: false, error: "The save has an invalid cleared-location list." };
+  }
+  const clearedLocationIds: string[] = [];
+  const clearedLocationSet = new Set<string>();
+  for (const locationId of rawClearedLocationIds) {
+    if (!isNonEmptyString(locationId) || !placedSet.has(locationId)) {
+      return {
+        ok: false,
+        error: `The save clears an unknown or unplaced location: ${String(locationId)}.`,
+      };
+    }
+    if (clearedLocationSet.has(locationId)) {
+      return { ok: false, error: `The save clears ${locationId} more than once.` };
+    }
+    clearedLocationSet.add(locationId);
+    clearedLocationIds.push(locationId);
+  }
+
   const positions: TrackerSave["positions"] = {};
   for (const [locationId, position] of Object.entries(value.positions)) {
     if (!placedSet.has(locationId)) {
@@ -230,6 +250,7 @@ function validateCurrentSave(
       seedName: value.seedName as string | undefined,
       savedAt: value.savedAt,
       placedLocationIds,
+      clearedLocationIds,
       positions,
       connections,
       activatedWarpLocationIds,
@@ -320,6 +341,7 @@ function migratePrototypeSave(
         ? value.savedAt
         : new Date().toISOString(),
       placedLocationIds: Object.keys(positions),
+      clearedLocationIds: [],
       positions,
       connections,
       activatedWarpLocationIds: [],
@@ -363,7 +385,7 @@ export function createTrackerSave(
   state: Pick<
     TrackerSave,
     "seedName" | "placedLocationIds" | "positions" | "connections" | "settings"
-  > & Partial<Pick<TrackerSave, "activatedWarpLocationIds">>,
+  > & Partial<Pick<TrackerSave, "activatedWarpLocationIds" | "clearedLocationIds">>,
 ): TrackerSave {
   return {
     schemaVersion: TRACKER_SCHEMA_VERSION,
@@ -371,6 +393,7 @@ export function createTrackerSave(
     savedAt: new Date().toISOString(),
     ...state,
     activatedWarpLocationIds: state.activatedWarpLocationIds ?? [],
+    clearedLocationIds: state.clearedLocationIds ?? [],
     settings: state.settings ?? { ...DEFAULT_SETTINGS },
   };
 }

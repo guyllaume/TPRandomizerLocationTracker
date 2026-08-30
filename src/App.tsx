@@ -46,6 +46,10 @@ import {
   parseTrackerSave,
 } from "./tracker/importExport";
 import { bringLocationIntoView, selectLocationNode } from "./tracker/locationJump";
+import {
+  deriveLocationPresentation,
+  toggleClearedLocationId,
+} from "./tracker/locationPresentation";
 import { clearStoredTracker, readStoredTracker } from "./tracker/persistence";
 import type {
   ArrowMode,
@@ -90,6 +94,7 @@ function applyFocusState(
           accessible: accessibleLocationIds.has(node.id),
           warpRouteEntranceIds: [],
           focusState: undefined,
+          presentation: deriveLocationPresentation(node.data.cleared, undefined),
         },
       })),
       edges: edges.map((edge) => ({
@@ -140,6 +145,7 @@ function applyFocusState(
         accessible: accessibleLocationIds.has(node.id),
         warpRouteEntranceIds: [...(routeEntrancesByLocation.get(node.id) ?? [])],
         focusState,
+        presentation: deriveLocationPresentation(node.data.cleared, focusState),
       },
     };
   });
@@ -200,6 +206,9 @@ export default function App() {
   const [activatedWarpLocationIds, setActivatedWarpLocationIds] = useState<string[]>(
     initial.save?.activatedWarpLocationIds ?? [],
   );
+  const [clearedLocationIds, setClearedLocationIds] = useState<string[]>(
+    initial.save?.clearedLocationIds ?? [],
+  );
   const [notice, setNotice] = useState(initial.notice ?? initial.error ?? "");
   const [storageWarning, setStorageWarning] = useState(
     initial.storageAvailable ? "" : initial.error ?? "Browser persistence is unavailable.",
@@ -217,6 +226,10 @@ export default function App() {
   const activatedWarpLocationIdSet = useMemo(
     () => new Set(activatedWarpLocationIds),
     [activatedWarpLocationIds],
+  );
+  const clearedLocationIdSet = useMemo(
+    () => new Set(clearedLocationIds),
+    [clearedLocationIds],
   );
   const locationGraph = useMemo(
     () => buildLocationGraph(connections, entranceDirectionsById),
@@ -258,6 +271,11 @@ export default function App() {
     );
   }, []);
 
+  const toggleCleared = useCallback((locationId: string) => {
+    if (!locationsById.has(locationId)) return;
+    setClearedLocationIds((current) => toggleClearedLocationId(current, locationId));
+  }, []);
+
   const removeLocation = useCallback((locationId: string) => {
     if (connections.some((connection) =>
       connection.sourceLocationId === locationId || connection.targetLocationId === locationId,
@@ -267,12 +285,20 @@ export default function App() {
     }
     setNodes((currentNodes) => currentNodes.filter((node) => node.id !== locationId));
     setActivatedWarpLocationIds((current) => current.filter((id) => id !== locationId));
+    setClearedLocationIds((current) => current.filter((id) => id !== locationId));
     setNotice("Location removed from the canvas. Its static definition remains in the palette.");
   }, [connections, setNodes]);
 
   const nodesWithConnectionData = useMemo(
-    () => updateNodeConnectionData(nodes, connections, removeLocation, toggleWarp),
-    [connections, nodes, removeLocation, toggleWarp],
+    () => updateNodeConnectionData(
+      nodes,
+      connections,
+      clearedLocationIdSet,
+      removeLocation,
+      toggleCleared,
+      toggleWarp,
+    ),
+    [clearedLocationIdSet, connections, nodes, removeLocation, toggleCleared, toggleWarp],
   );
 
   const { nodes: displayNodes, edges: displayEdges } = useMemo(
@@ -293,9 +319,10 @@ export default function App() {
       positions,
       connections,
       activatedWarpLocationIds,
+      clearedLocationIds,
       settings,
     }),
-    [activatedWarpLocationIds, seedName, placedLocationIds, positions, connections, settings],
+    [activatedWarpLocationIds, clearedLocationIds, seedName, placedLocationIds, positions, connections, settings],
   );
 
   const handleStorageError = useCallback((message: string) => setStorageWarning(message), []);
@@ -445,6 +472,7 @@ export default function App() {
       setEdges(buildEdges(result.save.connections));
       setSeedName(result.save.seedName ?? "");
       setActivatedWarpLocationIds(result.save.activatedWarpLocationIds);
+      setClearedLocationIds(result.save.clearedLocationIds);
       setSettings(result.save.settings);
       setNotice(result.warnings.length > 0
         ? `Run imported. ${result.warnings.join(" ")}`
@@ -464,6 +492,7 @@ export default function App() {
     setEdges([]);
     setSeedName("");
     setActivatedWarpLocationIds([]);
+    setClearedLocationIds([]);
     setSettings({ ...DEFAULT_SETTINGS });
     setNotice("Run reset. The canvas has no locations or connections.");
   }, [setEdges, setNodes]);

@@ -18,6 +18,8 @@ function node(id: string, selected = false): LocationFlowNode {
       },
       connectedEntranceIds: [],
       accessible: false,
+      cleared: false,
+      presentation: "expanded",
       warpRouteEntranceIds: [],
     },
   };

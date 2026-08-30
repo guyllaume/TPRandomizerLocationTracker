@@ -533,6 +533,7 @@ select:focus-visible,
 }
 
 .location-node {
+  position: relative;
   width: 300px;
   overflow: visible;
   color: var(--text);
@@ -540,7 +541,15 @@ select:focus-visible,
   border: 1px solid var(--border-strong);
   border-radius: 10px;
   box-shadow: var(--shadow);
-  transition: border-color 120ms ease, box-shadow 120ms ease, opacity 200ms ease;
+  transition: width 180ms ease, border-color 120ms ease, box-shadow 120ms ease, opacity 200ms ease;
+}
+
+.location-node.is-minimized {
+  width: 238px;
+}
+
+.location-node.is-cleared:not(.is-minimized) {
+  border-style: dashed;
 }
 
 .location-node.is-selected {
@@ -583,6 +592,20 @@ select:focus-visible,
 
 .location-header:active {
   cursor: grabbing;
+}
+
+.location-node.is-minimized .location-header {
+  min-height: 42px;
+  padding: 6px 8px 6px 11px;
+  border-bottom: 0;
+  border-radius: 9px;
+}
+
+.location-node.is-minimized .location-header h2 {
+  overflow: hidden;
+  font-size: 0.72rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .location-header h2 {
@@ -636,6 +659,42 @@ select:focus-visible,
   flex: 0 0 auto;
   align-items: center;
   gap: 7px;
+}
+
+.clear-location {
+  display: grid;
+  flex: 0 0 27px;
+  width: 27px;
+  height: 27px;
+  padding: 0;
+  place-items: center;
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-weight: 900;
+  line-height: 1;
+  background: transparent;
+  border: 1px solid var(--border-strong);
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.clear-location:hover,
+.clear-location:focus-visible {
+  color: var(--warp-route);
+  background: var(--warp-route-soft);
+  border-color: var(--warp-route);
+}
+
+.clear-location[aria-pressed="true"] {
+  color: white;
+  background: var(--warp-route);
+  border-color: var(--warp-route);
+}
+
+.location-node.is-minimized .clear-location {
+  flex-basis: 29px;
+  width: 29px;
+  height: 29px;
 }
 
 .warp-icon {
@@ -694,6 +753,41 @@ select:focus-visible,
   padding: 5px 0;
   background: var(--surface);
   border-radius: 0 0 9px 9px;
+  animation: expand-location-details 180ms ease-out;
+}
+
+.entrance-list.is-collapsed {
+  position: absolute;
+  top: 50%;
+  right: 0;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: visible;
+  opacity: 0;
+  pointer-events: none;
+  background: transparent;
+  animation: none;
+}
+
+.entrance-list.is-collapsed .entrance-row {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 1px;
+  height: 1px;
+  min-height: 1px;
+  padding: 0;
+  border: 0;
+}
+
+.entrance-list.is-collapsed .entrance-row > :not(.react-flow__handle) {
+  display: none;
+}
+
+@keyframes expand-location-details {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 .entrance-row {

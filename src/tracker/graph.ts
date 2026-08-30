@@ -43,6 +43,8 @@ export function buildNodes(
       location,
       connectedEntranceIds: [...(connectedByLocation.get(location.id) ?? [])],
       accessible: false,
+      cleared: false,
+      presentation: "expanded",
       warpRouteEntranceIds: [],
     },
     deletable: false,
@@ -120,7 +122,9 @@ export function positionsFromNodes(
 export function updateNodeConnectionData(
   nodes: LocationFlowNode[],
   connections: TrackerConnection[],
+  clearedLocationIds: ReadonlySet<string>,
   onRemoveLocation?: (locationId: string) => void,
+  onToggleCleared?: (locationId: string) => void,
   onToggleWarp?: (locationId: string) => void,
 ): LocationFlowNode[] {
   const connectedByLocation = connectedEntrancesByLocation(connections);
@@ -129,7 +133,9 @@ export function updateNodeConnectionData(
     data: {
       ...node.data,
       connectedEntranceIds: [...(connectedByLocation.get(node.id) ?? [])],
+      cleared: clearedLocationIds.has(node.id),
       onRemoveLocation,
+      onToggleCleared,
       onToggleWarp,
     },
   }));

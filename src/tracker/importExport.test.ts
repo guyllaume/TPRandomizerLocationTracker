@@ -22,6 +22,7 @@ function validSave(): TrackerSave {
       arrowMode: "forward",
     }],
     activatedWarpLocationIds: ["kakariko-village"],
+    clearedLocationIds: ["coro-s-house"],
     settings: {
       showMinimap: true,
       defaultArrowMode: "forward",
@@ -51,6 +52,7 @@ describe("tracker save validation", () => {
     delete olderSave.settings.defaultArrowMode;
     delete olderSave.settings.hidePlacedLocations;
     delete (olderSave as Record<string, unknown>).activatedWarpLocationIds;
+    delete (olderSave as Record<string, unknown>).clearedLocationIds;
 
     const result = validateTrackerSave(olderSave, locations);
     expect(result.ok).toBe(true);
@@ -59,6 +61,7 @@ describe("tracker save validation", () => {
       expect(result.save.settings.defaultArrowMode).toBe("forward");
       expect(result.save.settings.hidePlacedLocations).toBe(false);
       expect(result.save.activatedWarpLocationIds).toEqual([]);
+      expect(result.save.clearedLocationIds).toEqual([]);
     }
   });
 
@@ -89,6 +92,7 @@ describe("tracker save validation", () => {
       expect(result.save.placedLocationIds).toEqual(["kakariko-village"]);
       expect(result.save.connections).toEqual([]);
       expect(result.save.activatedWarpLocationIds).toEqual([]);
+      expect(result.save.clearedLocationIds).toEqual([]);
       expect(result.warnings.join(" ")).toContain("obsolete connection");
     }
   });
@@ -161,6 +165,20 @@ describe("tracker save validation", () => {
     const notAWarpResult = validateTrackerSave(notAWarp, locations);
     expect(notAWarpResult.ok).toBe(false);
     if (!notAWarpResult.ok) expect(notAWarpResult.error).toContain("unknown warp");
+  });
+
+  it("rejects cleared locations that are unknown, unplaced, or duplicated", () => {
+    const unplaced = validSave();
+    unplaced.clearedLocationIds = ["lake-hylia"];
+    const unplacedResult = validateTrackerSave(unplaced, locations);
+    expect(unplacedResult.ok).toBe(false);
+    if (!unplacedResult.ok) expect(unplacedResult.error).toContain("unknown or unplaced");
+
+    const duplicated = validSave();
+    duplicated.clearedLocationIds = ["coro-s-house", "coro-s-house"];
+    const duplicatedResult = validateTrackerSave(duplicated, locations);
+    expect(duplicatedResult.ok).toBe(false);
+    if (!duplicatedResult.ok) expect(duplicatedResult.error).toContain("more than once");
   });
 
   it("builds a safe export filename", () => {

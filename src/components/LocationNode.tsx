@@ -1,5 +1,5 @@
-import type { NodeProps } from "@xyflow/react";
-import { memo } from "react";
+import { useUpdateNodeInternals, type NodeProps } from "@xyflow/react";
+import { memo, useEffect, type MouseEvent } from "react";
 import greenWarpIcon from "../../icons/ezgif-482ef2a92ce44a3f.png";
 import redWarpIcon from "../../icons/ezgif-4cc6456631015bee.png";
 import type { LocationFlowNode } from "../types/tracker";
@@ -10,16 +10,35 @@ function LocationNodeComponent({ id, data, selected }: NodeProps<LocationFlowNod
   const isSpecial = data.location.specialFlags?.includes("hyrule-castle");
   const focusClass = data.focusState ? `is-${data.focusState}` : "";
   const routeEntrances = new Set(data.warpRouteEntranceIds);
+  const isMinimized = data.presentation === "minimized";
+  const updateNodeInternals = useUpdateNodeInternals();
+
+  useEffect(() => {
+    updateNodeInternals(id);
+  }, [data.presentation, id, updateNodeInternals]);
+
+  const toggleCleared = (event: MouseEvent<HTMLButtonElement>) => {
+    event.stopPropagation();
+    data.onToggleCleared?.(id);
+  };
+
+  const cardClasses = [
+    "location-node",
+    selected && "is-selected",
+    data.cleared && "is-cleared",
+    isMinimized && "is-minimized",
+    focusClass,
+  ].filter(Boolean).join(" ");
 
   return (
-    <article className={`location-node ${selected ? "is-selected" : ""} ${focusClass}`.trim()}>
+    <article className={cardClasses}>
       <header className="location-header">
         <div className="location-title">
           <div className="location-name-line">
             <h2>{data.location.name}</h2>
             {isSpecial && <span className="special-badge" title="Hyrule Castle special metadata">Castle</span>}
           </div>
-          <p>{data.location.primaryGroup}</p>
+          {!isMinimized && <p>{data.location.primaryGroup}</p>}
         </div>
         <div className="location-status">
           {data.location.hasWarp && (
@@ -38,24 +57,41 @@ function LocationNodeComponent({ id, data, selected }: NodeProps<LocationFlowNod
               />
             </button>
           )}
-          <span
-            className="location-progress"
-            aria-label={`${connected.size} of ${data.location.entrances.length} discovered`}
+          {!isMinimized && (
+            <span
+              className="location-progress"
+              aria-label={`${connected.size} of ${data.location.entrances.length} discovered`}
+            >
+              {connected.size} / {data.location.entrances.length}
+            </span>
+          )}
+          <button
+            type="button"
+            className="clear-location nodrag nopan"
+            aria-label={`Mark ${data.location.name} ${data.cleared ? "not cleared" : "cleared"}`}
+            aria-pressed={data.cleared}
+            title={data.cleared ? "Mark not cleared" : "Mark cleared"}
+            onClick={toggleCleared}
           >
-            {connected.size} / {data.location.entrances.length}
-          </span>
+            <span aria-hidden="true">✓</span>
+          </button>
         </div>
-        <button
-          type="button"
-          className="remove-location nodrag nopan"
-          onClick={() => data.onRemoveLocation?.(id)}
-          aria-label={`Remove ${data.location.name} from the canvas`}
-          title={connected.size > 0 ? "Disconnect this location before removing it" : "Remove from canvas"}
-        >
-          ×
-        </button>
+        {!isMinimized && (
+          <button
+            type="button"
+            className="remove-location nodrag nopan"
+            onClick={() => data.onRemoveLocation?.(id)}
+            aria-label={`Remove ${data.location.name} from the canvas`}
+            title={connected.size > 0 ? "Disconnect this location before removing it" : "Remove from canvas"}
+          >
+            ×
+          </button>
+        )}
       </header>
-      <div className="entrance-list">
+      <div
+        className={`entrance-list ${isMinimized ? "is-collapsed" : ""}`}
+        aria-hidden={isMinimized || undefined}
+      >
         {data.location.entrances.map((entrance) => (
           <EntranceHandle
             key={entrance.id}
