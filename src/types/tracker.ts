@@ -102,7 +102,7 @@ export interface LocationNodeData extends Record<string, unknown> {
   connectedEntranceIds: string[];
   accessible: boolean;
   warpRouteEntranceIds: string[];
-  focusState?: "selected" | "related" | "warp-route" | "warp-start" | "dimmed";
+  focusState?: "selected" | "related" | "warp-route" | "warp-destination" | "dimmed";
   onRemoveLocation?: (locationId: string) => void;
   onToggleWarp?: (locationId: string) => void;
 }

@@ -45,6 +45,7 @@ import {
   downloadTrackerSave,
   parseTrackerSave,
 } from "./tracker/importExport";
+import { bringLocationIntoView, selectLocationNode } from "./tracker/locationJump";
 import { clearStoredTracker, readStoredTracker } from "./tracker/persistence";
 import type {
   ArrowMode,
@@ -119,11 +120,11 @@ function applyFocusState(
   }
 
   const updatedNodes = nodes.map((node) => {
-    let focusState: "selected" | "related" | "warp-route" | "warp-start" | "dimmed";
+    let focusState: "selected" | "related" | "warp-route" | "warp-destination" | "dimmed";
     if (node.id === selectedNode.id) {
       focusState = "selected";
     } else if (routeWarpLocationIds.has(node.id)) {
-      focusState = "warp-start";
+      focusState = "warp-destination";
     } else if (routeLocationIds.has(node.id)) {
       focusState = "warp-route";
     } else if (relatedLocationIds.has(node.id)) {
@@ -411,6 +412,14 @@ export default function App() {
     setNotice(`${location.name} added to the canvas.`);
   }, [connections, nodes.length, placedLocationIdSet, setNodes]);
 
+  const jumpToLocation = useCallback((locationId: string) => {
+    setNodes((currentNodes) => selectLocationNode(currentNodes, locationId));
+    setEdges((currentEdges) => currentEdges.map((edge) =>
+      edge.selected ? { ...edge, selected: false } : edge,
+    ));
+    void bringLocationIntoView(flowRef.current, locationId);
+  }, [setEdges, setNodes]);
+
   const exportRun = useCallback(() => {
     downloadTrackerSave(createTrackerSave(persistenceState));
     setNotice("Run exported as a JSON backup.");
@@ -463,11 +472,14 @@ export default function App() {
     <main className="app-shell">
       <TrackerToolbar
         seedName={seedName}
+        locations={locations}
+        placedLocationIds={placedLocationIdSet}
         connectionCount={connections.length}
         showMinimap={settings.showMinimap}
         defaultArrowMode={settings.defaultArrowMode}
         importInputRef={importInputRef}
         onSeedNameChange={setSeedName}
+        onSelectLocation={jumpToLocation}
         onExport={exportRun}
         onImportClick={() => importInputRef.current?.click()}
         onImportFile={importRun}
