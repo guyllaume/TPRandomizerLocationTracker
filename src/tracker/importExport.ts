@@ -8,6 +8,8 @@ import type {
 import { DEFAULT_SETTINGS, TRACKER_SCHEMA_VERSION, TRACKER_VERSION } from "./constants";
 import { endpointsKey } from "./graph";
 
+export const MAX_TRACKER_IMPORT_BYTES = 5 * 1024 * 1024;
+
 export type ValidationResult =
   | { ok: true; save: TrackerSave; warnings: string[] }
   | { ok: false; error: string };

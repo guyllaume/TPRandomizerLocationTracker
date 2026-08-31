@@ -43,6 +43,7 @@ import {
 import {
   createTrackerSave,
   downloadTrackerSave,
+  MAX_TRACKER_IMPORT_BYTES,
   parseTrackerSave,
 } from "./tracker/importExport";
 import { bringLocationIntoView, selectLocationNode } from "./tracker/locationJump";
@@ -456,6 +457,11 @@ export default function App() {
     const file = event.target.files?.[0];
     event.target.value = "";
     if (!file) return;
+
+    if (file.size > MAX_TRACKER_IMPORT_BYTES) {
+      setNotice("Import failed: the selected file is larger than 5 MiB. Your current run was not changed.");
+      return;
+    }
 
     try {
       const result = parseTrackerSave(await file.text(), locations);
