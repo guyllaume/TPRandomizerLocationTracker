@@ -86,8 +86,8 @@ export interface TrackerSettings {
 }
 
 export interface TrackerSave {
-  schemaVersion: 2;
-  trackerVersion: string;
+  schemaVersion: 1;
+  appVersion: string;
   seedName?: string;
   savedAt: string;
   placedLocationIds: string[];

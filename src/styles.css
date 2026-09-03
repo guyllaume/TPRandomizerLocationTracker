@@ -113,6 +113,10 @@ select:focus-visible,
   margin: 0;
 }
 
+.app-version {
+  white-space: nowrap;
+}
+
 .location-quick-jump {
   position: relative;
   display: grid;

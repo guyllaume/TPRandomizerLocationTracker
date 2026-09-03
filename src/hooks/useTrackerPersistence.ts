@@ -10,13 +10,16 @@ export function useTrackerPersistence(
     "activatedWarpLocationIds" | "clearedLocationIds" | "settings"
   >,
   onStorageError: (message: string) => void,
+  enabled = true,
 ): void {
   useEffect(() => {
+    if (!enabled) return;
+
     const timeout = window.setTimeout(() => {
       const result = writeStoredTracker(createTrackerSave(state));
       if (!result.ok) onStorageError(result.error);
     }, 250);
 
     return () => window.clearTimeout(timeout);
-  }, [state, onStorageError]);
+  }, [state, onStorageError, enabled]);
 }

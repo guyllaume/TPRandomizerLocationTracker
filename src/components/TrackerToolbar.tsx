@@ -1,6 +1,7 @@
 import type { ChangeEvent, RefObject } from "react";
 import type { LocationSearchItem } from "../tracker/locationSearch";
 import type { ArrowMode } from "../types/tracker";
+import { APP_VERSION } from "../tracker/constants";
 import tpRandomizerMainIcon from "../../icons/TPrandomizerMainIcon.jpg";
 import { LocationQuickJump } from "./LocationQuickJump";
 
@@ -49,7 +50,10 @@ export function TrackerToolbar({
         </div>
         <div>
           <h1>Entrance Tracker</h1>
-          <p>{connectionCount} discovered connection{connectionCount === 1 ? "" : "s"}</p>
+          <p>
+            {connectionCount} discovered connection{connectionCount === 1 ? "" : "s"}
+            <span className="app-version"> &middot; v{APP_VERSION}</span>
+          </p>
         </div>
       </div>
 

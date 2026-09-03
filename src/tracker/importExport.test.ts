@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { locations } from "../data/locations";
 import type { TrackerSave } from "../types/tracker";
+import { APP_VERSION, IMMEDIATE_PREVIOUS_APP_VERSION } from "./constants";
 import { createTrackerSave, exportFilename, parseTrackerSave, validateTrackerSave } from "./importExport";
 
 function validSave(): TrackerSave {
@@ -43,6 +44,49 @@ describe("tracker save validation", () => {
     }
   });
 
+  it("writes independent application and schema version metadata", () => {
+    const save = validSave();
+
+    expect(save.schemaVersion).toBe(1);
+    expect(save.appVersion).toBe(APP_VERSION);
+    expect(save).not.toHaveProperty("trackerVersion");
+  });
+
+  it("loads a save from a later app release when its schema is still current", () => {
+    const laterReleaseSave = { ...validSave(), appVersion: "0.2.0" };
+    const result = validateTrackerSave(laterReleaseSave, locations);
+
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.save.appVersion).toBe("0.2.0");
+  });
+
+  it("migrates the immediately previous run format", () => {
+    const previous = {
+      ...validSave(),
+      schemaVersion: 2,
+      trackerVersion: IMMEDIATE_PREVIOUS_APP_VERSION,
+    } as unknown as Record<string, unknown>;
+    delete previous.appVersion;
+
+    const result = validateTrackerSave(previous, locations);
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.save.schemaVersion).toBe(1);
+      expect(result.save.appVersion).toBe(IMMEDIATE_PREVIOUS_APP_VERSION);
+      expect(result.save.connections).toHaveLength(1);
+      expect(result.warnings.join(" ")).toContain("immediately previous");
+    }
+  });
+
+  it("rejects a newer schema with a safe compatibility message", () => {
+    const futureSave = { ...validSave(), schemaVersion: 2 };
+    const result = validateTrackerSave(futureSave, locations);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toContain("newer version of the application");
+  });
+
   it("loads saves without optional arrow and palette settings with safe defaults", () => {
     const olderSave = validSave() as unknown as {
       connections: Array<Record<string, unknown>>;
@@ -62,38 +106,6 @@ describe("tracker save validation", () => {
       expect(result.save.settings.hidePlacedLocations).toBe(false);
       expect(result.save.activatedWarpLocationIds).toEqual([]);
       expect(result.save.clearedLocationIds).toEqual([]);
-    }
-  });
-
-  it("migrates prototype saves and ignores obsolete graph references", () => {
-    const result = validateTrackerSave({
-      schemaVersion: 1,
-      trackerVersion: "0.1.0",
-      savedAt: "2026-08-25T12:00:00.000Z",
-      seedName: "Old run",
-      positions: {
-        "kakariko-village": { x: 10, y: 20 },
-        "not-a-location": { x: 0, y: 0 },
-      },
-      connections: [{
-        id: "old-connection",
-        sourceRegionId: "kakariko-village",
-        sourceEntranceId: "kakariko-graveyard",
-        targetRegionId: "lake-hylia",
-        targetEntranceId: "lake-spirit-cave",
-        direction: "discovered",
-      }],
-      settings: { showMinimap: true },
-    }, locations);
-
-    expect(result.ok).toBe(true);
-    if (result.ok) {
-      expect(result.save.schemaVersion).toBe(2);
-      expect(result.save.placedLocationIds).toEqual(["kakariko-village"]);
-      expect(result.save.connections).toEqual([]);
-      expect(result.save.activatedWarpLocationIds).toEqual([]);
-      expect(result.save.clearedLocationIds).toEqual([]);
-      expect(result.warnings.join(" ")).toContain("obsolete connection");
     }
   });
 

@@ -25,20 +25,21 @@ Entrance   = one connectable handle on that card
 Connection = one randomized relationship discovered by the player
 ```
 
-Provinces and groups organize the searchable location palette; they are not graph nodes. Dataset IDs are stable and used directly for both cards and handles. Spreadsheet provenance remains in the static JSON for debugging, but it is not displayed in the normal tracker UI and is never interpreted as a graph edge. A fresh or reset run therefore has no placed locations and `connections: []`.
+Provinces and groups organize the searchable location palette; they are not graph nodes. Dataset location and entrance IDs are stable persistence keys and must not be renamed after release. Display names may change independently without changing their IDs. Spreadsheet provenance remains in the static JSON for debugging, but it is not displayed in the normal tracker UI and is never interpreted as a graph edge. A fresh or reset run therefore has no placed locations and `connections: []`.
 
 The single canonical dataset is [`src/data/locations.json`](src/data/locations.json). Typed access lives in `src/data/locations.ts`, and `src/data/validateLocations.test.ts` verifies ID uniqueness, entrance coverage, recognized types and directions, absence of static connections, and Hyrule Castle metadata.
 
 ## Saving and migration
 
-Run schema v2 stores only user state:
+Run schema v1 stores only user state. The application release and save schema are versioned independently:
 
 ```text
-schemaVersion, trackerVersion, seedName, savedAt,
-placedLocationIds, positions, connections, activatedWarpLocationIds, settings
+schemaVersion, appVersion, seedName, savedAt,
+placedLocationIds, positions, connections, activatedWarpLocationIds,
+clearedLocationIds, settings
 ```
 
-Browser state uses the localStorage key `tp-entrance-tracker:run:v2`. The loader can migrate an old v1 prototype save, preserving valid positions and connections where their IDs still exist and reporting obsolete references that were ignored. Invalid or corrupt current saves never crash the app. If localStorage is unavailable, the tracker remains usable and recommends **Export Run**.
+Browser state uses the stable localStorage key `tp-entrance-tracker:run`. A narrow compatibility bridge also recognizes the immediately previous build's `tp-entrance-tracker:run:v2` format, validates it, and converts its metadata to schema 1 before writing to the stable key; the original value is not overwritten during migration. Older experimental formats are intentionally unsupported. Application releases do not need a new schema number, so later releases remain compatible while they use schema 1. A newer or unknown schema is not loaded, changed, or overwritten; the tracker shows a compatibility message and pauses autosave until the user explicitly imports a compatible run or resets. If localStorage is unavailable, the tracker remains usable and recommends **Export Run**.
 
 Imports validate placed location IDs, position values, entrance IDs, connection IDs, duplicate relationships, and one-way endpoint direction before replacing the active run. Exports do not embed `locations.json`.
 

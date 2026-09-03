@@ -5,13 +5,22 @@ import type {
   TrackerConnection,
   TrackerSave,
 } from "../types/tracker";
-import { DEFAULT_SETTINGS, TRACKER_SCHEMA_VERSION, TRACKER_VERSION } from "./constants";
+import {
+  APP_VERSION,
+  DEFAULT_SETTINGS,
+  IMMEDIATE_PREVIOUS_APP_VERSION,
+  TRACKER_SCHEMA_VERSION,
+} from "./constants";
 import { endpointsKey } from "./graph";
 
 export const MAX_TRACKER_IMPORT_BYTES = 5 * 1024 * 1024;
 
 export type ValidationResult =
   | { ok: true; save: TrackerSave; warnings: string[] }
+  | { ok: false; error: string };
+
+type NormalizationResult =
+  | { ok: true; value: Record<string, unknown>; warnings: string[] }
   | { ok: false; error: string };
 
 type EntranceIndex = Map<string, Map<string, EntranceDefinition>>;
@@ -26,6 +35,40 @@ function isNonEmptyString(value: unknown): value is string {
 
 function isArrowMode(value: unknown): value is ArrowMode {
   return ["forward", "reverse", "bidirectional"].includes(value as string);
+}
+
+export function normalizePersistedState(value: unknown): NormalizationResult {
+  if (!isRecord(value)) {
+    return { ok: false, error: "The file does not contain a tracker save." };
+  }
+
+  if (
+    value.schemaVersion === 2 &&
+    value.appVersion === undefined &&
+    value.trackerVersion === IMMEDIATE_PREVIOUS_APP_VERSION
+  ) {
+    return {
+      ok: true,
+      value: {
+        ...value,
+        schemaVersion: TRACKER_SCHEMA_VERSION,
+        appVersion: value.trackerVersion,
+      },
+      warnings: ["Run from the immediately previous tracker format migrated to schema v1."],
+    };
+  }
+
+  if (typeof value.schemaVersion === "number" && value.schemaVersion > TRACKER_SCHEMA_VERSION) {
+    return {
+      ok: false,
+      error: "This tracker was created with a newer version of the application and cannot be loaded safely by this version.",
+    };
+  }
+  if (value.schemaVersion !== TRACKER_SCHEMA_VERSION) {
+    return { ok: false, error: `Unsupported save schema: ${String(value.schemaVersion)}.` };
+  }
+
+  return { ok: true, value, warnings: [] };
 }
 
 function entranceIndex(definitions: LocationDefinition[]): EntranceIndex {
@@ -112,9 +155,10 @@ function validateConnection(
 function validateCurrentSave(
   value: Record<string, unknown>,
   definitions: LocationDefinition[],
+  warnings: string[],
 ): ValidationResult {
-  if (!isNonEmptyString(value.trackerVersion)) {
-    return { ok: false, error: "The save is missing its tracker version." };
+  if (!isNonEmptyString(value.appVersion)) {
+    return { ok: false, error: "The save is missing its application version." };
   }
   if (!isNonEmptyString(value.savedAt) || Number.isNaN(Date.parse(value.savedAt))) {
     return { ok: false, error: "The save has an invalid timestamp." };
@@ -245,10 +289,10 @@ function validateCurrentSave(
 
   return {
     ok: true,
-    warnings: [],
+    warnings,
     save: {
       schemaVersion: TRACKER_SCHEMA_VERSION,
-      trackerVersion: value.trackerVersion,
+      appVersion: value.appVersion,
       seedName: value.seedName as string | undefined,
       savedAt: value.savedAt,
       placedLocationIds,
@@ -265,111 +309,14 @@ function validateCurrentSave(
   };
 }
 
-function migratePrototypeSave(
-  value: Record<string, unknown>,
-  definitions: LocationDefinition[],
-): ValidationResult {
-  if (!isRecord(value.positions) || !Array.isArray(value.connections)) {
-    return { ok: false, error: "The prototype save has invalid graph state." };
-  }
-
-  const validEntrances = entranceIndex(definitions);
-  const validLocationIds = new Set(definitions.map((location) => location.id));
-  const positions: TrackerSave["positions"] = {};
-  let ignoredPositions = 0;
-  for (const [locationId, position] of Object.entries(value.positions)) {
-    if (
-      !validLocationIds.has(locationId) ||
-      !isRecord(position) ||
-      typeof position.x !== "number" ||
-      !Number.isFinite(position.x) ||
-      typeof position.y !== "number" ||
-      !Number.isFinite(position.y)
-    ) {
-      ignoredPositions += 1;
-      continue;
-    }
-    positions[locationId] = { x: position.x, y: position.y };
-  }
-
-  const connections: TrackerConnection[] = [];
-  let ignoredConnections = 0;
-  const connectionIds = new Set<string>();
-  const endpointPairs = new Set<string>();
-  for (const [index, oldConnection] of value.connections.entries()) {
-    if (!isRecord(oldConnection)) {
-      ignoredConnections += 1;
-      continue;
-    }
-    const migrated = {
-      ...oldConnection,
-      sourceLocationId: oldConnection.sourceRegionId,
-      targetLocationId: oldConnection.targetRegionId,
-    };
-    const result = validateConnection(migrated, validEntrances, index);
-    if (!result.ok) {
-      ignoredConnections += 1;
-      continue;
-    }
-    const pair = endpointsKey(result.connection);
-    if (connectionIds.has(result.connection.id) || endpointPairs.has(pair)) {
-      ignoredConnections += 1;
-      continue;
-    }
-    connectionIds.add(result.connection.id);
-    endpointPairs.add(pair);
-    connections.push(result.connection);
-    if (!(result.connection.sourceLocationId in positions)) {
-      positions[result.connection.sourceLocationId] = { x: 40, y: 40 };
-    }
-    if (!(result.connection.targetLocationId in positions)) {
-      positions[result.connection.targetLocationId] = { x: 390, y: 40 };
-    }
-  }
-
-  const oldSettings = isRecord(value.settings) ? value.settings : {};
-  const warnings = ["Prototype save migrated to schema v2."];
-  if (ignoredPositions > 0) warnings.push(`${ignoredPositions} obsolete position(s) were ignored.`);
-  if (ignoredConnections > 0) warnings.push(`${ignoredConnections} obsolete connection(s) were ignored.`);
-
-  return {
-    ok: true,
-    warnings,
-    save: {
-      schemaVersion: TRACKER_SCHEMA_VERSION,
-      trackerVersion: TRACKER_VERSION,
-      seedName: typeof value.seedName === "string" ? value.seedName : undefined,
-      savedAt: isNonEmptyString(value.savedAt) && !Number.isNaN(Date.parse(value.savedAt))
-        ? value.savedAt
-        : new Date().toISOString(),
-      placedLocationIds: Object.keys(positions),
-      clearedLocationIds: [],
-      positions,
-      connections,
-      activatedWarpLocationIds: [],
-      settings: {
-        showMinimap: typeof oldSettings.showMinimap === "boolean"
-          ? oldSettings.showMinimap
-          : DEFAULT_SETTINGS.showMinimap,
-        defaultArrowMode: isArrowMode(oldSettings.defaultArrowMode)
-          ? oldSettings.defaultArrowMode
-          : DEFAULT_SETTINGS.defaultArrowMode,
-        hidePlacedLocations: false,
-      },
-    },
-  };
-}
-
 export function validateTrackerSave(
   value: unknown,
   definitions: LocationDefinition[],
 ): ValidationResult {
-  if (!isRecord(value)) return { ok: false, error: "The file does not contain a tracker save." };
-  if (value.schemaVersion === 1) return migratePrototypeSave(value, definitions);
-  if (value.schemaVersion !== TRACKER_SCHEMA_VERSION) {
-    return { ok: false, error: `Unsupported save schema: ${String(value.schemaVersion)}.` };
-  }
-  return validateCurrentSave(value, definitions);
+  const normalized = normalizePersistedState(value);
+  if (!normalized.ok) return normalized;
+
+  return validateCurrentSave(normalized.value, definitions, normalized.warnings);
 }
 
 export function parseTrackerSave(
@@ -391,7 +338,7 @@ export function createTrackerSave(
 ): TrackerSave {
   return {
     schemaVersion: TRACKER_SCHEMA_VERSION,
-    trackerVersion: TRACKER_VERSION,
+    appVersion: APP_VERSION,
     savedAt: new Date().toISOString(),
     ...state,
     activatedWarpLocationIds: state.activatedWarpLocationIds ?? [],

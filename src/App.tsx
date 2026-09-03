@@ -214,6 +214,7 @@ export default function App() {
   const [storageWarning, setStorageWarning] = useState(
     initial.storageAvailable ? "" : initial.error ?? "Browser persistence is unavailable.",
   );
+  const [persistenceAllowed, setPersistenceAllowed] = useState(initial.persistenceAllowed);
   const importInputRef = useRef<HTMLInputElement>(null);
   const canvasRef = useRef<HTMLElement>(null);
   const flowRef = useRef<ReactFlowInstance<LocationFlowNode, TrackerFlowEdge> | null>(null);
@@ -327,7 +328,7 @@ export default function App() {
   );
 
   const handleStorageError = useCallback((message: string) => setStorageWarning(message), []);
-  useTrackerPersistence(persistenceState, handleStorageError);
+  useTrackerPersistence(persistenceState, handleStorageError, persistenceAllowed);
 
   const isConnectionValid = useCallback((candidate: Connection | Edge) => {
     if (!candidate.sourceHandle || !candidate.targetHandle) return false;
@@ -480,6 +481,7 @@ export default function App() {
       setActivatedWarpLocationIds(result.save.activatedWarpLocationIds);
       setClearedLocationIds(result.save.clearedLocationIds);
       setSettings(result.save.settings);
+      setPersistenceAllowed(true);
       setNotice(result.warnings.length > 0
         ? `Run imported. ${result.warnings.join(" ")}`
         : "Run imported successfully.");
@@ -494,6 +496,7 @@ export default function App() {
     )) return;
 
     clearStoredTracker();
+    setPersistenceAllowed(true);
     setNodes([]);
     setEdges([]);
     setSeedName("");

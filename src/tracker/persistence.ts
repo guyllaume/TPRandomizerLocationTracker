@@ -1,10 +1,11 @@
 import type { LocationDefinition, TrackerSave } from "../types/tracker";
-import { LEGACY_STORAGE_KEY, STORAGE_KEY } from "./constants";
+import { IMMEDIATE_PREVIOUS_STORAGE_KEY, STORAGE_KEY } from "./constants";
 import { parseTrackerSave } from "./importExport";
 
 export interface StorageReadResult {
   save: TrackerSave | null;
   storageAvailable: boolean;
+  persistenceAllowed: boolean;
   error?: string;
   notice?: string;
 }
@@ -14,27 +15,31 @@ export function readStoredTracker(
   storage: Pick<Storage, "getItem"> = localStorage,
 ): StorageReadResult {
   try {
-    const current = storage.getItem(STORAGE_KEY);
-    const raw = current ?? storage.getItem(LEGACY_STORAGE_KEY);
-    if (raw === null) return { save: null, storageAvailable: true };
+    const raw = storage.getItem(STORAGE_KEY) ?? storage.getItem(IMMEDIATE_PREVIOUS_STORAGE_KEY);
+    if (raw === null) {
+      return { save: null, storageAvailable: true, persistenceAllowed: true };
+    }
 
     const parsed = parseTrackerSave(raw, definitions);
     if (!parsed.ok) {
       return {
         save: null,
         storageAvailable: true,
-        error: `Saved run could not be loaded: ${parsed.error}`,
+        persistenceAllowed: false,
+        error: `Saved run could not be loaded: ${parsed.error} Autosave has been paused to protect the stored data.`,
       };
     }
     return {
       save: parsed.save,
       storageAvailable: true,
+      persistenceAllowed: true,
       notice: parsed.warnings.length > 0 ? parsed.warnings.join(" ") : undefined,
     };
   } catch {
     return {
       save: null,
       storageAvailable: false,
+      persistenceAllowed: false,
       error: "Browser persistence is unavailable. Use Export Run to keep a backup.",
     };
   }
@@ -60,7 +65,7 @@ export function clearStoredTracker(
 ): void {
   try {
     storage.removeItem(STORAGE_KEY);
-    storage.removeItem(LEGACY_STORAGE_KEY);
+    storage.removeItem(IMMEDIATE_PREVIOUS_STORAGE_KEY);
   } catch {
     // Reset remains usable in memory when storage is unavailable.
   }
