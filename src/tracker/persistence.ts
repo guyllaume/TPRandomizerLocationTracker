@@ -1,4 +1,4 @@
-import type { LocationDefinition, TrackerSave } from "../types/tracker";
+import type { DatasetVersion, LocationDefinition, TrackerSave } from "../types/tracker";
 import { IMMEDIATE_PREVIOUS_STORAGE_KEY, STORAGE_KEY } from "./constants";
 import { parseTrackerSave } from "./importExport";
 
@@ -11,7 +11,7 @@ export interface StorageReadResult {
 }
 
 export function readStoredTracker(
-  definitions: LocationDefinition[],
+  definitionsByDatasetVersion: Readonly<Record<DatasetVersion, LocationDefinition[]>>,
   storage: Pick<Storage, "getItem"> = localStorage,
 ): StorageReadResult {
   try {
@@ -20,7 +20,7 @@ export function readStoredTracker(
       return { save: null, storageAvailable: true, persistenceAllowed: true };
     }
 
-    const parsed = parseTrackerSave(raw, definitions);
+    const parsed = parseTrackerSave(raw, definitionsByDatasetVersion);
     if (!parsed.ok) {
       return {
         save: null,

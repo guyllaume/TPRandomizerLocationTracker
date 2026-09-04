@@ -41,6 +41,18 @@ function LocationNodeComponent({ id, data, selected }: NodeProps<LocationFlowNod
           {!isMinimized && <p>{data.location.primaryGroup}</p>}
         </div>
         <div className="location-status">
+          {!isMinimized && (
+            <button
+              type="button"
+              className="start-location-toggle nodrag nopan"
+              aria-label={`${data.isStart ? "Clear" : "Set"} ${data.location.name} as START`}
+              aria-pressed={data.isStart}
+              title={data.isStart ? "Clear Start" : "Set as Start"}
+              onClick={() => data.onToggleStart?.(id)}
+            >
+              {data.isStart ? "START" : "Set start"}
+            </button>
+          )}
           {data.location.hasWarp && (
             <button
               type="button"
@@ -75,18 +87,18 @@ function LocationNodeComponent({ id, data, selected }: NodeProps<LocationFlowNod
           >
             <span aria-hidden="true">✓</span>
           </button>
+          {!isMinimized && (
+            <button
+              type="button"
+              className="remove-location nodrag nopan"
+              onClick={() => data.onRemoveLocation?.(id)}
+              aria-label={`Remove ${data.location.name} from the canvas`}
+              title={connected.size > 0 ? "Disconnect this location before removing it" : "Remove from canvas"}
+            >
+              ×
+            </button>
+          )}
         </div>
-        {!isMinimized && (
-          <button
-            type="button"
-            className="remove-location nodrag nopan"
-            onClick={() => data.onRemoveLocation?.(id)}
-            aria-label={`Remove ${data.location.name} from the canvas`}
-            title={connected.size > 0 ? "Disconnect this location before removing it" : "Remove from canvas"}
-          >
-            ×
-          </button>
-        )}
       </header>
       <div
         className={`entrance-list ${isMinimized ? "is-collapsed" : ""}`}

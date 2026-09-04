@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "datasetVersion": "0.2-review",
+  "datasetVersion": "0.2",
   "game": "The Legend of Zelda: Twilight Princess",
   "randomizerVersion": "1.4.0 development",
   "sourceWorkbook": "Twilight Princess Entrance Randomizer Location List [Coupled].xlsx",
@@ -58,10 +58,6 @@
       "normalized": "Mirror Chamber Portal"
     },
     {
-      "source": "South Faron Woods Behind Gate / South Cave Entrance",
-      "normalized": "South Faron Woods – Behind Gate / South Cave Entrance"
-    },
-    {
       "source": "Sacred Grove Past Behind Window",
       "normalized": "Sacred Grove Past – Window"
     },
@@ -83,16 +79,16 @@
     }
   ],
   "stats": {
-    "locationCount": 117,
-    "entranceCount": 282,
+    "locationCount": 113,
+    "entranceCount": 278,
     "entrancesByType": {
       "boss-room": 16,
       "cave": 18,
       "dungeons": 18,
       "grotto": 42,
-      "interior": 76,
+      "interior": 77,
       "one-way": 33,
-      "overworld": 79
+      "overworld": 74
     },
     "oneWayOutCount": 17,
     "oneWayInCount": 16
@@ -221,7 +217,7 @@
       "entrances": [
         {
           "id": "ordon-spring--ordon-bridge",
-          "name": "Ordon Bridge",
+          "name": "South Faron Woods – Bridge",
           "type": "overworld",
           "direction": "both",
           "sourceLabels": [
@@ -391,62 +387,6 @@
       ]
     },
     {
-      "id": "ordon-bridge",
-      "name": "Ordon Bridge",
-      "locationKind": "overworld",
-      "primaryGroup": "Ordona Province",
-      "sourceSheets": [
-        "Ordona Province",
-        "Faron Province"
-      ],
-      "sourceGroups": [
-        "Ordon Link's House",
-        "South Faron Woods"
-      ],
-      "entrances": [
-        {
-          "id": "ordon-bridge--ordon-spring",
-          "name": "Ordon Spring",
-          "type": "overworld",
-          "direction": "both",
-          "sourceLabels": [
-            "Ordon Bridge"
-          ],
-          "sourceRows": [
-            {
-              "sheet": "Ordona Province",
-              "row": 8,
-              "group": "Ordon Link's House",
-              "vanillaEntrance": "Ordon Spring → Ordon Bridge"
-            }
-          ]
-        },
-        {
-          "id": "ordon-bridge--south-faron-woods",
-          "name": "South Faron Woods",
-          "type": "overworld",
-          "direction": "both",
-          "sourceLabels": [
-            "Ordon Bridge"
-          ],
-          "sourceRows": [
-            {
-              "sheet": "Ordona Province",
-              "row": 9,
-              "group": "Ordon Link's House",
-              "vanillaEntrance": "Ordon Bridge → South Faron Woods"
-            },
-            {
-              "sheet": "Faron Province",
-              "row": 5,
-              "group": "South Faron Woods",
-              "vanillaEntrance": "South Faron Woods → Ordon Bridge"
-            }
-          ]
-        }
-      ]
-    },
-    {
       "id": "south-faron-woods",
       "name": "South Faron Woods",
       "hasWarp": true,
@@ -467,24 +407,6 @@
       ],
       "entrances": [
         {
-          "id": "south-faron-woods--behind-gate",
-          "name": "Behind Gate / South Cave Entrance",
-          "type": "overworld",
-          "direction": "both",
-          "sourceLabels": [
-            "South Faron Woods Behind Gate",
-            "South Faron Woods South Cave Entrance"
-          ],
-          "sourceRows": [
-            {
-              "sheet": "Faron Province",
-              "row": 6,
-              "group": "South Faron Woods",
-              "vanillaEntrance": "South Faron Woods Behind Gate → South Faron Woods South Cave Entrance"
-            }
-          ]
-        },
-        {
           "id": "south-faron-woods--faron-field",
           "name": "Faron Field",
           "type": "overworld",
@@ -504,23 +426,6 @@
               "row": 25,
               "group": "Faron Field",
               "vanillaEntrance": "Faron Field → South Faron Woods Behind Field Gate"
-            }
-          ]
-        },
-        {
-          "id": "south-faron-woods--faron-woods",
-          "name": "Faron Woods",
-          "type": "overworld",
-          "direction": "both",
-          "sourceLabels": [
-            "South Faron Woods North Cave Entrance"
-          ],
-          "sourceRows": [
-            {
-              "sheet": "Faron Province",
-              "row": 14,
-              "group": "Faron Woods",
-              "vanillaEntrance": "Faron Woods → South Faron Woods North Cave Entrance"
             }
           ]
         },
@@ -548,25 +453,19 @@
           ]
         },
         {
-          "id": "south-faron-woods--ordon-bridge",
-          "name": "Ordon Bridge",
+          "id": "ordon-bridge--ordon-spring",
+          "name": "Ordon Spring – Bridge",
           "type": "overworld",
           "direction": "both",
           "sourceLabels": [
-            "South Faron Woods"
+            "Ordon Bridge"
           ],
           "sourceRows": [
             {
               "sheet": "Ordona Province",
-              "row": 9,
+              "row": 8,
               "group": "Ordon Link's House",
-              "vanillaEntrance": "Ordon Bridge → South Faron Woods"
-            },
-            {
-              "sheet": "Faron Province",
-              "row": 5,
-              "group": "South Faron Woods",
-              "vanillaEntrance": "South Faron Woods → Ordon Bridge"
+              "vanillaEntrance": "Ordon Spring → Ordon Bridge"
             }
           ]
         },
@@ -1070,23 +969,6 @@
               "row": 15,
               "group": "Faron Woods",
               "vanillaEntrance": "Faron Woods Owl Statue Chest → South Faron Woods Above Owl Statue"
-            }
-          ]
-        },
-        {
-          "id": "faron-woods--south-faron-woods-north-cave",
-          "name": "South Faron Woods – North Cave",
-          "type": "overworld",
-          "direction": "both",
-          "sourceLabels": [
-            "Faron Woods"
-          ],
-          "sourceRows": [
-            {
-              "sheet": "Faron Province",
-              "row": 14,
-              "group": "Faron Woods",
-              "vanillaEntrance": "Faron Woods → South Faron Woods North Cave Entrance"
             }
           ]
         },
@@ -2146,6 +2028,23 @@
           ]
         },
         {
+          "id": "top-of-kakariko-watchtower--kakariko-watchtower-upper-door",
+          "name": "Kakariko Watchtower – Upper Door",
+          "type": "interior",
+          "direction": "both",
+          "sourceLabels": [
+            "Top of Watchtower"
+          ],
+          "sourceRows": [
+            {
+              "sheet": "Eldin Province",
+              "row": 23,
+              "group": "Kakariko Village",
+              "vanillaEntrance": "Watchtower Upper Door → Top of Watchtower"
+            }
+          ]
+        },
+        {
           "id": "kakariko-village--renado-s-sanctuary-back-door",
           "name": "Renado's Sanctuary – Back Door",
           "type": "interior",
@@ -2654,37 +2553,6 @@
       ]
     },
     {
-      "id": "top-of-kakariko-watchtower",
-      "name": "Top of Kakariko Watchtower",
-      "locationKind": "overworld",
-      "primaryGroup": "Eldin Province",
-      "sourceSheets": [
-        "Eldin Province"
-      ],
-      "sourceGroups": [
-        "Kakariko Village"
-      ],
-      "entrances": [
-        {
-          "id": "top-of-kakariko-watchtower--kakariko-watchtower-upper-door",
-          "name": "Kakariko Watchtower – Upper Door",
-          "type": "interior",
-          "direction": "both",
-          "sourceLabels": [
-            "Top of Watchtower"
-          ],
-          "sourceRows": [
-            {
-              "sheet": "Eldin Province",
-              "row": 23,
-              "group": "Kakariko Village",
-              "vanillaEntrance": "Watchtower Upper Door → Top of Watchtower"
-            }
-          ]
-        }
-      ]
-    },
-    {
       "id": "lake-hylia",
       "name": "Lake Hylia",
       "hasWarp": true,
@@ -3114,6 +2982,23 @@
               "vanillaEntrance": "Eldin Field → Eldin Field Water Bomb Fish Grotto"
             }
           ]
+        },
+        {
+          "id": "eldin-field-grotto-platform--entrance",
+          "name": "Eldin Field Stalfos Grotto",
+          "type": "grotto",
+          "direction": "both",
+          "sourceLabels": [
+            "Eldin Field Grotto Platform"
+          ],
+          "sourceRows": [
+            {
+              "sheet": "Eldin Province",
+              "row": 45,
+              "group": "Eldin Field",
+              "vanillaEntrance": "Eldin Field Grotto Platform → Eldin Field Stalfos Grotto"
+            }
+          ]
         }
       ]
     },
@@ -3407,37 +3292,6 @@
               "row": 48,
               "group": "Hidden Village",
               "vanillaEntrance": "Hidden Village Outside → Impa's House"
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "id": "eldin-field-grotto-platform",
-      "name": "Eldin Field Grotto Platform",
-      "locationKind": "grotto",
-      "primaryGroup": "Eldin Province",
-      "sourceSheets": [
-        "Eldin Province"
-      ],
-      "sourceGroups": [
-        "Eldin Field"
-      ],
-      "entrances": [
-        {
-          "id": "eldin-field-grotto-platform--entrance",
-          "name": "Entrance",
-          "type": "grotto",
-          "direction": "both",
-          "sourceLabels": [
-            "Eldin Field Grotto Platform"
-          ],
-          "sourceRows": [
-            {
-              "sheet": "Eldin Province",
-              "row": 45,
-              "group": "Eldin Field",
-              "vanillaEntrance": "Eldin Field Grotto Platform → Eldin Field Stalfos Grotto"
             }
           ]
         }
@@ -4960,6 +4814,23 @@
               "vanillaEntrance": "Lake Hylia Bridge → Flight By Fowl"
             }
           ]
+        },
+        {
+          "id": "lake-hylia-bridge-grotto-ledge--entrance",
+          "name": "Lake Hylia Bridge Bubble Grotto",
+          "type": "grotto",
+          "direction": "both",
+          "sourceLabels": [
+            "Lake Hylia Bridge Grotto Ledge"
+          ],
+          "sourceRows": [
+            {
+              "sheet": "Lanayru Province",
+              "row": 43,
+              "group": "Lake Hylia",
+              "vanillaEntrance": "Lake Hylia Bridge Grotto Ledge → Lake Hylia Bridge Bubble Grotto"
+            }
+          ]
         }
       ]
     },
@@ -5061,37 +4932,6 @@
           "direction": "both",
           "sourceLabels": [
             "Lake Hylia Bridge Bubble Grotto"
-          ],
-          "sourceRows": [
-            {
-              "sheet": "Lanayru Province",
-              "row": 43,
-              "group": "Lake Hylia",
-              "vanillaEntrance": "Lake Hylia Bridge Grotto Ledge → Lake Hylia Bridge Bubble Grotto"
-            }
-          ]
-        }
-      ]
-    },
-    {
-      "id": "lake-hylia-bridge-grotto-ledge",
-      "name": "Lake Hylia Bridge Grotto Ledge",
-      "locationKind": "grotto",
-      "primaryGroup": "Lanayru Province",
-      "sourceSheets": [
-        "Lanayru Province"
-      ],
-      "sourceGroups": [
-        "Lake Hylia"
-      ],
-      "entrances": [
-        {
-          "id": "lake-hylia-bridge-grotto-ledge--entrance",
-          "name": "Entrance",
-          "type": "grotto",
-          "direction": "both",
-          "sourceLabels": [
-            "Lake Hylia Bridge Grotto Ledge"
           ],
           "sourceRows": [
             {
@@ -5549,7 +5389,18 @@
               "row": 56,
               "group": "Zora's River",
               "vanillaEntrance": "Upper Zora's River Ledge → Fishing Hole"
-            },
+            }
+          ]
+        },
+        {
+          "id": "fishing-hole--fishing-hole-house-door",
+          "name": "Fishing Hole House Door",
+          "type": "interior",
+          "direction": "both",
+          "sourceLabels": [
+            "Fishing Hole"
+          ],
+          "sourceRows": [
             {
               "sheet": "Lanayru Province",
               "row": 57,
@@ -6015,7 +5866,7 @@
     },
     {
       "id": "snowpeak-ice-keese-grotto",
-      "name": "Snowpeak Ice Keese Grotto",
+      "name": "Snowpeak Ice Keese Grotto (Snowpeak Chu Grotto)",
       "locationKind": "grotto",
       "primaryGroup": "Peak Province",
       "sourceSheets": [

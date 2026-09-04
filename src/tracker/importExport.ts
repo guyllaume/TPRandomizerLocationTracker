@@ -1,10 +1,16 @@
 import type {
   ArrowMode,
+  DatasetVersion,
   EntranceDefinition,
   LocationDefinition,
   TrackerConnection,
   TrackerSave,
 } from "../types/tracker";
+import {
+  CURRENT_DATASET_VERSION,
+  isDatasetVersion,
+  LEGACY_DATASET_VERSION,
+} from "../data/locationDatasets";
 import {
   APP_VERSION,
   DEFAULT_SETTINGS,
@@ -24,6 +30,22 @@ type NormalizationResult =
   | { ok: false; error: string };
 
 type EntranceIndex = Map<string, Map<string, EntranceDefinition>>;
+type DatasetDefinitions = Readonly<Record<DatasetVersion, LocationDefinition[]>>;
+
+const RETIRED_LOCATION_REPLACEMENTS: Readonly<Record<string, string>> = {
+  "eldin-field-grotto-platform": "eldin-field",
+  "lake-hylia-bridge-grotto-ledge": "lake-hylia-bridge",
+  "ordon-bridge": "south-faron-woods",
+  "top-of-kakariko-watchtower": "kakariko-village",
+};
+
+const OBSOLETE_ENTRANCE_IDS: ReadonlySet<string> = new Set([
+  "faron-woods--south-faron-woods-north-cave",
+  "ordon-bridge--south-faron-woods",
+  "south-faron-woods--behind-gate",
+  "south-faron-woods--faron-woods",
+  "south-faron-woods--ordon-bridge",
+]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -69,6 +91,89 @@ export function normalizePersistedState(value: unknown): NormalizationResult {
   }
 
   return { ok: true, value, warnings: [] };
+}
+
+function normalizeRetiredLocationReferences(
+  value: Record<string, unknown>,
+): { value: Record<string, unknown>; warnings: string[] } {
+  const normalized = { ...value };
+  const replacementsUsed = new Set<string>();
+  let obsoleteConnectionCount = 0;
+  const replaceId = (candidate: unknown): unknown => {
+    if (typeof candidate !== "string") return candidate;
+    const replacement = RETIRED_LOCATION_REPLACEMENTS[candidate];
+    if (!replacement) return candidate;
+    replacementsUsed.add(`${candidate} → ${replacement}`);
+    return replacement;
+  };
+
+  const normalizeLocationList = (candidate: unknown): unknown => {
+    if (!Array.isArray(candidate)) return candidate;
+    const result: unknown[] = [];
+    const seen = new Map<string, boolean>();
+    for (const item of candidate) {
+      const replacement = replaceId(item);
+      if (typeof replacement === "string") {
+        const isRetiredReference = replacement !== item;
+        if (seen.has(replacement) && (isRetiredReference || seen.get(replacement))) continue;
+        seen.set(replacement, isRetiredReference);
+      }
+      result.push(replacement);
+    }
+    return result;
+  };
+
+  normalized.placedLocationIds = normalizeLocationList(value.placedLocationIds);
+  normalized.clearedLocationIds = normalizeLocationList(value.clearedLocationIds);
+  normalized.activatedWarpLocationIds = normalizeLocationList(value.activatedWarpLocationIds);
+  normalized.startLocationId = replaceId(value.startLocationId);
+
+  if (isRecord(value.positions)) {
+    const positions: Record<string, unknown> = {};
+    for (const [locationId, position] of Object.entries(value.positions)) {
+      if (!RETIRED_LOCATION_REPLACEMENTS[locationId]) positions[locationId] = position;
+    }
+    for (const [locationId, position] of Object.entries(value.positions)) {
+      const replacement = replaceId(locationId) as string;
+      if (!(replacement in positions)) positions[replacement] = position;
+    }
+    normalized.positions = positions;
+  }
+
+  if (Array.isArray(value.connections)) {
+    normalized.connections = value.connections.flatMap((connection) => {
+      if (!isRecord(connection)) return [connection];
+      if (
+        (typeof connection.sourceEntranceId === "string" &&
+          OBSOLETE_ENTRANCE_IDS.has(connection.sourceEntranceId)) ||
+        (typeof connection.targetEntranceId === "string" &&
+          OBSOLETE_ENTRANCE_IDS.has(connection.targetEntranceId))
+      ) {
+        obsoleteConnectionCount += 1;
+        return [];
+      }
+      return [{
+        ...connection,
+        sourceLocationId: replaceId(connection.sourceLocationId),
+        targetLocationId: replaceId(connection.targetLocationId),
+      }];
+    });
+  }
+
+  const warnings: string[] = [];
+  if (replacementsUsed.size > 0) {
+    warnings.push(`Retired location references normalized (${[...replacementsUsed].join(", ")}).`);
+  }
+  if (obsoleteConnectionCount > 0) {
+    warnings.push(
+      `${obsoleteConnectionCount} connection${obsoleteConnectionCount === 1 ? "" : "s"} using obsolete entrance handles removed.`,
+    );
+  }
+
+  return {
+    value: normalized,
+    warnings,
+  };
 }
 
 function entranceIndex(definitions: LocationDefinition[]): EntranceIndex {
@@ -156,6 +261,7 @@ function validateCurrentSave(
   value: Record<string, unknown>,
   definitions: LocationDefinition[],
   warnings: string[],
+  datasetVersion: DatasetVersion,
 ): ValidationResult {
   if (!isNonEmptyString(value.appVersion)) {
     return { ok: false, error: "The save is missing its application version." };
@@ -204,6 +310,18 @@ function validateCurrentSave(
     placedSet.add(locationId);
     placedLocationIds.push(locationId);
   }
+
+  const rawStartLocationId = value.startLocationId ?? null;
+  if (
+    rawStartLocationId !== null &&
+    (!isNonEmptyString(rawStartLocationId) || !locationIds.has(rawStartLocationId))
+  ) {
+    return { ok: false, error: `The save has an unknown START location: ${String(rawStartLocationId)}.` };
+  }
+  if (rawStartLocationId !== null && !placedSet.has(rawStartLocationId)) {
+    return { ok: false, error: `The save has an unplaced START location: ${rawStartLocationId}.` };
+  }
+  const startLocationId = rawStartLocationId as string | null;
 
   const rawActivatedWarpLocationIds = value.activatedWarpLocationIds ?? [];
   if (!Array.isArray(rawActivatedWarpLocationIds)) {
@@ -293,7 +411,9 @@ function validateCurrentSave(
     save: {
       schemaVersion: TRACKER_SCHEMA_VERSION,
       appVersion: value.appVersion,
+      datasetVersion,
       seedName: value.seedName as string | undefined,
+      startLocationId,
       savedAt: value.savedAt,
       placedLocationIds,
       clearedLocationIds,
@@ -311,20 +431,44 @@ function validateCurrentSave(
 
 export function validateTrackerSave(
   value: unknown,
-  definitions: LocationDefinition[],
+  definitionsByDatasetVersion: DatasetDefinitions,
 ): ValidationResult {
   const normalized = normalizePersistedState(value);
   if (!normalized.ok) return normalized;
 
-  return validateCurrentSave(normalized.value, definitions, normalized.warnings);
+  let datasetVersion: DatasetVersion;
+  const datasetWarnings = [...normalized.warnings];
+  if (normalized.value.datasetVersion === undefined) {
+    datasetVersion = LEGACY_DATASET_VERSION;
+    datasetWarnings.push("Unversioned run classified as legacy dataset v0.1.");
+  } else if (isDatasetVersion(normalized.value.datasetVersion)) {
+    datasetVersion = normalized.value.datasetVersion;
+  } else {
+    return {
+      ok: false,
+      error: `Unsupported tracker dataset: ${String(normalized.value.datasetVersion)}.`,
+    };
+  }
+
+  const selectedValue = { ...normalized.value, datasetVersion };
+  const datasetState = datasetVersion === CURRENT_DATASET_VERSION
+    ? normalizeRetiredLocationReferences(selectedValue)
+    : { value: selectedValue, warnings: [] };
+
+  return validateCurrentSave(
+    datasetState.value,
+    definitionsByDatasetVersion[datasetVersion],
+    [...datasetWarnings, ...datasetState.warnings],
+    datasetVersion,
+  );
 }
 
 export function parseTrackerSave(
   json: string,
-  definitions: LocationDefinition[],
+  definitionsByDatasetVersion: DatasetDefinitions,
 ): ValidationResult {
   try {
-    return validateTrackerSave(JSON.parse(json) as unknown, definitions);
+    return validateTrackerSave(JSON.parse(json) as unknown, definitionsByDatasetVersion);
   } catch {
     return { ok: false, error: "The selected file is not valid JSON." };
   }
@@ -334,14 +478,19 @@ export function createTrackerSave(
   state: Pick<
     TrackerSave,
     "seedName" | "placedLocationIds" | "positions" | "connections" | "settings"
-  > & Partial<Pick<TrackerSave, "activatedWarpLocationIds" | "clearedLocationIds">>,
+  > & Partial<Pick<
+    TrackerSave,
+    "activatedWarpLocationIds" | "startLocationId" | "clearedLocationIds" | "datasetVersion"
+  >>,
 ): TrackerSave {
   return {
     schemaVersion: TRACKER_SCHEMA_VERSION,
     appVersion: APP_VERSION,
     savedAt: new Date().toISOString(),
     ...state,
+    datasetVersion: state.datasetVersion ?? CURRENT_DATASET_VERSION,
     activatedWarpLocationIds: state.activatedWarpLocationIds ?? [],
+    startLocationId: state.startLocationId ?? null,
     clearedLocationIds: state.clearedLocationIds ?? [],
     settings: state.settings ?? { ...DEFAULT_SETTINGS },
   };

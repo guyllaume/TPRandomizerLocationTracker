@@ -1,9 +1,8 @@
-import type { LocationDataset } from "../types/tracker";
-import rawDataset from "./locations.json";
+import { currentLocationDataset } from "./locationDatasets";
 
-// The JSON file is the single canonical static dataset. Its schema and values
-// are exercised by validateLocations.test.ts rather than duplicated here.
-export const locationDataset = rawDataset as LocationDataset;
+// These convenience exports retain the current-dataset API for non-runtime
+// helpers and tests. App resolves its seed's selected dataset independently.
+export const locationDataset = currentLocationDataset;
 export const locations = locationDataset.locations;
 
 export const locationsById = new Map(

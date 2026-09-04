@@ -1,12 +1,14 @@
 import type { ChangeEvent, RefObject } from "react";
 import type { LocationSearchItem } from "../tracker/locationSearch";
-import type { ArrowMode } from "../types/tracker";
+import type { ArrowMode, DatasetVersion } from "../types/tracker";
 import { APP_VERSION } from "../tracker/constants";
 import tpRandomizerMainIcon from "../../icons/TPrandomizerMainIcon.jpg";
 import { LocationQuickJump } from "./LocationQuickJump";
 
 interface TrackerToolbarProps {
   seedName: string;
+  datasetVersion: DatasetVersion;
+  datasetVersionLocked: boolean;
   locations: readonly LocationSearchItem[];
   placedLocationIds: ReadonlySet<string>;
   connectionCount: number;
@@ -14,6 +16,7 @@ interface TrackerToolbarProps {
   defaultArrowMode: ArrowMode;
   importInputRef: RefObject<HTMLInputElement | null>;
   onSeedNameChange: (value: string) => void;
+  onDatasetVersionChange: (version: DatasetVersion) => void;
   onSelectLocation: (locationId: string) => void;
   onExport: () => void;
   onImportClick: () => void;
@@ -26,6 +29,8 @@ interface TrackerToolbarProps {
 
 export function TrackerToolbar({
   seedName,
+  datasetVersion,
+  datasetVersionLocked,
   locations,
   placedLocationIds,
   connectionCount,
@@ -33,6 +38,7 @@ export function TrackerToolbar({
   defaultArrowMode,
   importInputRef,
   onSeedNameChange,
+  onDatasetVersionChange,
   onSelectLocation,
   onExport,
   onImportClick,
@@ -71,6 +77,21 @@ export function TrackerToolbar({
           placeholder="Seed 473829"
           maxLength={100}
         />
+      </label>
+
+      <label className="dataset-version-field">
+        <span>Locations</span>
+        <select
+          value={datasetVersion}
+          disabled={datasetVersionLocked}
+          onChange={(event) => onDatasetVersionChange(event.target.value as DatasetVersion)}
+          title={datasetVersionLocked
+            ? "Remove recorded connections before changing location datasets"
+            : "Choose the location definitions for this run"}
+        >
+          <option value="0.2">v0.2 Current (recommended)</option>
+          <option value="0.1">v0.1 Legacy / pre-v0.2</option>
+        </select>
       </label>
 
       <label className="default-direction-field">

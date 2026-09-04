@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { locations } from "../data/locations";
+import { locationDefinitionsByDatasetVersion } from "../data/locationDatasets";
 import {
   APP_VERSION,
   IMMEDIATE_PREVIOUS_APP_VERSION,
@@ -11,7 +11,7 @@ import { readStoredTracker, writeStoredTracker } from "./persistence";
 
 describe("tracker persistence", () => {
   it("returns an empty run when storage has no save", () => {
-    const result = readStoredTracker(locations, { getItem: () => null });
+    const result = readStoredTracker(locationDefinitionsByDatasetVersion, { getItem: () => null });
     expect(result).toEqual({
       save: null,
       storageAvailable: true,
@@ -20,7 +20,9 @@ describe("tracker persistence", () => {
   });
 
   it("handles corrupt stored data gracefully", () => {
-    const result = readStoredTracker(locations, { getItem: () => "not-json" });
+    const result = readStoredTracker(locationDefinitionsByDatasetVersion, {
+      getItem: () => "not-json",
+    });
     expect(result.save).toBeNull();
     expect(result.storageAvailable).toBe(true);
     expect(result.persistenceAllowed).toBe(false);
@@ -28,7 +30,7 @@ describe("tracker persistence", () => {
   });
 
   it("reports unavailable storage reads", () => {
-    const result = readStoredTracker(locations, {
+    const result = readStoredTracker(locationDefinitionsByDatasetVersion, {
       getItem: () => { throw new Error("blocked"); },
     });
     expect(result.storageAvailable).toBe(false);
@@ -69,8 +71,33 @@ describe("tracker persistence", () => {
     expect(writeStoredTracker(save, { setItem: (_key, value) => { stored = value; } })).toEqual({
       ok: true,
     });
-    const result = readStoredTracker(locations, { getItem: () => stored });
+    const result = readStoredTracker(locationDefinitionsByDatasetVersion, {
+      getItem: () => stored,
+    });
     expect(result.save?.clearedLocationIds).toEqual(["coro-s-house"]);
+  });
+
+  it("persists and reloads the selected START location", () => {
+    const save = createTrackerSave({
+      startLocationId: "coro-s-house",
+      placedLocationIds: ["coro-s-house"],
+      positions: { "coro-s-house": { x: 12, y: 34 } },
+      connections: [],
+      settings: {
+        showMinimap: false,
+        defaultArrowMode: "forward",
+        hidePlacedLocations: false,
+      },
+    });
+    let stored = "";
+
+    expect(writeStoredTracker(save, { setItem: (_key, value) => { stored = value; } })).toEqual({
+      ok: true,
+    });
+    const result = readStoredTracker(locationDefinitionsByDatasetVersion, {
+      getItem: () => stored,
+    });
+    expect(result.save?.startLocationId).toBe("coro-s-house");
   });
 
   it("persists application and schema metadata", () => {
@@ -98,7 +125,42 @@ describe("tracker persistence", () => {
     expect(JSON.parse(storedValue)).toMatchObject({
       schemaVersion: 1,
       appVersion: APP_VERSION,
+      datasetVersion: "0.2",
     });
+  });
+
+  it("persists and reloads a run's selected legacy dataset", () => {
+    const save = createTrackerSave({
+      datasetVersion: "0.1",
+      placedLocationIds: ["ordon-bridge", "south-faron-woods"],
+      positions: {
+        "ordon-bridge": { x: 10, y: 20 },
+        "south-faron-woods": { x: 300, y: 20 },
+      },
+      connections: [{
+        id: "legacy-connection",
+        sourceLocationId: "ordon-bridge",
+        sourceEntranceId: "ordon-bridge--south-faron-woods",
+        targetLocationId: "south-faron-woods",
+        targetEntranceId: "south-faron-woods--ordon-bridge",
+        direction: "discovered",
+        arrowMode: "forward",
+      }],
+      settings: {
+        showMinimap: true,
+        defaultArrowMode: "forward",
+        hidePlacedLocations: false,
+      },
+    });
+    let stored = "";
+    writeStoredTracker(save, { setItem: (_key, value) => { stored = value; } });
+
+    const result = readStoredTracker(locationDefinitionsByDatasetVersion, {
+      getItem: () => stored,
+    });
+
+    expect(result.save?.datasetVersion).toBe("0.1");
+    expect(result.save?.connections).toEqual(save.connections);
   });
 
   it("loads the immediately previous stored run without mutating its original value", () => {
@@ -129,7 +191,7 @@ describe("tracker persistence", () => {
       removeItem: () => { mutationCalls += 1; },
     };
 
-    const result = readStoredTracker(locations, storage);
+    const result = readStoredTracker(locationDefinitionsByDatasetVersion, storage);
 
     expect(requestedKeys).toEqual([STORAGE_KEY, IMMEDIATE_PREVIOUS_STORAGE_KEY]);
     expect(result.save?.placedLocationIds).toEqual(["coro-s-house"]);
@@ -156,7 +218,7 @@ describe("tracker persistence", () => {
       removeItem: () => { mutationCalls += 1; },
     };
 
-    const result = readStoredTracker(locations, storage);
+    const result = readStoredTracker(locationDefinitionsByDatasetVersion, storage);
 
     expect(result.save).toBeNull();
     expect(result.persistenceAllowed).toBe(false);
