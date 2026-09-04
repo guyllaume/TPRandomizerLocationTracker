@@ -20,11 +20,10 @@ import { LocationPalette } from "./components/LocationPalette";
 import { TrackerEdge } from "./components/TrackerEdge";
 import { TrackerToolbar } from "./components/TrackerToolbar";
 import {
-  entranceDirectionsById,
-  entrancesById,
-  locations,
-  locationsById,
-} from "./data/locations";
+  CURRENT_DATASET_VERSION,
+  locationDefinitionsByDatasetVersion,
+  resolveLocationDataset,
+} from "./data/locationDatasets";
 import { useTrackerPersistence } from "./hooks/useTrackerPersistence";
 import { DEFAULT_SETTINGS } from "./tracker/constants";
 import {
@@ -52,8 +51,13 @@ import {
   toggleClearedLocationId,
 } from "./tracker/locationPresentation";
 import { clearStoredTracker, readStoredTracker } from "./tracker/persistence";
+import {
+  availableWarpDestinationIds,
+  toggleStartLocationId,
+} from "./tracker/startLocation";
 import type {
   ArrowMode,
+  DatasetVersion,
   LocationDefinition,
   LocationFlowNode,
   TrackerConnection,
@@ -63,11 +67,11 @@ import type {
 
 const nodeTypes: NodeTypes = { location: LocationNode };
 const edgeTypes: EdgeTypes = { tracker: TrackerEdge };
-const warpLocationIds = locations
-  .filter((location) => location.hasWarp)
-  .map((location) => location.id);
 
-function definitionsForIds(ids: string[]): LocationDefinition[] {
+function definitionsForIds(
+  ids: string[],
+  locationsById: ReadonlyMap<string, LocationDefinition>,
+): LocationDefinition[] {
   return ids
     .map((id) => locationsById.get(id))
     .filter((location): location is LocationDefinition => location !== undefined);
@@ -187,12 +191,17 @@ function applyFocusState(
 }
 
 export default function App() {
-  const [initial] = useState(() => readStoredTracker(locations));
+  const [initial] = useState(() => readStoredTracker(locationDefinitionsByDatasetVersion));
+  const initialDatasetVersion = initial.save?.datasetVersion ?? CURRENT_DATASET_VERSION;
+  const initialLocations = resolveLocationDataset(initialDatasetVersion).locations;
+  const initialLocationsById = new Map(
+    initialLocations.map((location) => [location.id, location]),
+  );
   const initialPlacedIds = initial.save?.placedLocationIds ?? [];
   const initialConnections = initial.save?.connections ?? [];
   const [nodes, setNodes, onNodesChange] = useNodesState<LocationFlowNode>(
     buildNodes(
-      definitionsForIds(initialPlacedIds),
+      definitionsForIds(initialPlacedIds, initialLocationsById),
       initial.save?.positions ?? {},
       initialConnections,
     ),
@@ -201,11 +210,15 @@ export default function App() {
     buildEdges(initialConnections),
   );
   const [seedName, setSeedName] = useState(initial.save?.seedName ?? "");
+  const [datasetVersion, setDatasetVersion] = useState<DatasetVersion>(initialDatasetVersion);
   const [settings, setSettings] = useState<TrackerSettings>(
     initial.save?.settings ?? { ...DEFAULT_SETTINGS },
   );
   const [activatedWarpLocationIds, setActivatedWarpLocationIds] = useState<string[]>(
     initial.save?.activatedWarpLocationIds ?? [],
+  );
+  const [startLocationId, setStartLocationId] = useState<string | null>(
+    initial.save?.startLocationId ?? null,
   );
   const [clearedLocationIds, setClearedLocationIds] = useState<string[]>(
     initial.save?.clearedLocationIds ?? [],
@@ -219,6 +232,31 @@ export default function App() {
   const canvasRef = useRef<HTMLElement>(null);
   const flowRef = useRef<ReactFlowInstance<LocationFlowNode, TrackerFlowEdge> | null>(null);
 
+  const locationDataset = useMemo(
+    () => resolveLocationDataset(datasetVersion),
+    [datasetVersion],
+  );
+  const locations = locationDataset.locations;
+  const locationsById = useMemo(
+    () => new Map(locations.map((location) => [location.id, location])),
+    [locations],
+  );
+  const entrancesById = useMemo(
+    () => new Map(locations.flatMap((location) =>
+      location.entrances.map((entrance) => [
+        entrance.id,
+        { locationId: location.id, entrance },
+      ] as const),
+    )),
+    [locations],
+  );
+  const entranceDirectionsById = useMemo(
+    () => new Map(locations.flatMap((location) =>
+      location.entrances.map((entrance) => [entrance.id, entrance.direction] as const),
+    )),
+    [locations],
+  );
+
   const connections = useMemo(
     () => edges.map(edgeToConnection).filter((item): item is TrackerConnection => item !== null),
     [edges],
@@ -229,14 +267,23 @@ export default function App() {
     () => new Set(activatedWarpLocationIds),
     [activatedWarpLocationIds],
   );
+  const availableWarpLocationIds = useMemo(
+    () => availableWarpDestinationIds(activatedWarpLocationIds, startLocationId),
+    [activatedWarpLocationIds, startLocationId],
+  );
+  const availableWarpLocationIdSet = useMemo(
+    () => new Set(availableWarpLocationIds),
+    [availableWarpLocationIds],
+  );
   const clearedLocationIdSet = useMemo(
     () => new Set(clearedLocationIds),
     [clearedLocationIds],
   );
   const locationGraph = useMemo(
     () => buildLocationGraph(connections, entranceDirectionsById),
-    [connections],
+    [connections, entranceDirectionsById],
   );
+  // Physical portal activation remains separate from START's derived warp availability.
   const accessibleLocationIds = activatedWarpLocationIdSet;
   const selectedLocationId = useMemo(
     () => nodes.find((node) => node.selected)?.id,
@@ -247,11 +294,11 @@ export default function App() {
       ? findShortestAccessibleWarpRoutes(
           locationGraph,
           selectedLocationId,
-          warpLocationIds,
-          accessibleLocationIds,
+          availableWarpLocationIds,
+          availableWarpLocationIdSet,
         )
       : [],
-    [accessibleLocationIds, locationGraph, selectedLocationId],
+    [availableWarpLocationIdSet, availableWarpLocationIds, locationGraph, selectedLocationId],
   );
   const selectedConnection = useMemo(() => {
     const selectedEdge = edges.find((edge) => edge.selected);
@@ -263,6 +310,37 @@ export default function App() {
     : false;
   const positions = useMemo(() => positionsFromNodes(nodes), [nodes]);
 
+  const changeDatasetVersion = useCallback((nextVersion: DatasetVersion) => {
+    if (nextVersion === datasetVersion) return;
+    if (connections.length > 0) {
+      setNotice("Location dataset cannot be changed after entrance connections are recorded.");
+      return;
+    }
+
+    const nextLocations = resolveLocationDataset(nextVersion).locations;
+    const nextLocationsById = new Map(nextLocations.map((location) => [location.id, location]));
+    const incompatibleLocationIds = placedLocationIds.filter((id) => !nextLocationsById.has(id));
+    if (incompatibleLocationIds.length > 0) {
+      setNotice(
+        `Cannot switch location datasets while ${incompatibleLocationIds.length} incompatible ` +
+        `location${incompatibleLocationIds.length === 1 ? " is" : "s are"} placed. Remove ` +
+        `${incompatibleLocationIds.join(", ")} first.`,
+      );
+      return;
+    }
+
+    setDatasetVersion(nextVersion);
+    setNodes(buildNodes(
+      definitionsForIds(placedLocationIds, nextLocationsById),
+      positions,
+      [],
+    ));
+    const datasetNotice = nextVersion === CURRENT_DATASET_VERSION
+        ? "Using current v0.2 location definitions."
+        : "Using legacy pre-v0.2 location definitions for this run.";
+    setNotice(datasetNotice);
+  }, [connections.length, datasetVersion, placedLocationIds, positions, setNodes]);
+
   const toggleWarp = useCallback((locationId: string) => {
     const location = locationsById.get(locationId);
     if (!location?.hasWarp) return;
@@ -271,12 +349,17 @@ export default function App() {
         ? current.filter((id) => id !== locationId)
         : [...current, locationId].sort(),
     );
-  }, []);
+  }, [locationsById]);
 
   const toggleCleared = useCallback((locationId: string) => {
     if (!locationsById.has(locationId)) return;
     setClearedLocationIds((current) => toggleClearedLocationId(current, locationId));
-  }, []);
+  }, [locationsById]);
+
+  const toggleStart = useCallback((locationId: string) => {
+    if (!locationsById.has(locationId)) return;
+    setStartLocationId((current) => toggleStartLocationId(current, locationId));
+  }, [locationsById]);
 
   const removeLocation = useCallback((locationId: string) => {
     if (connections.some((connection) =>
@@ -288,6 +371,7 @@ export default function App() {
     setNodes((currentNodes) => currentNodes.filter((node) => node.id !== locationId));
     setActivatedWarpLocationIds((current) => current.filter((id) => id !== locationId));
     setClearedLocationIds((current) => current.filter((id) => id !== locationId));
+    setStartLocationId((current) => current === locationId ? null : current);
     setNotice("Location removed from the canvas. Its static definition remains in the palette.");
   }, [connections, setNodes]);
 
@@ -299,8 +383,19 @@ export default function App() {
       removeLocation,
       toggleCleared,
       toggleWarp,
+      startLocationId,
+      toggleStart,
     ),
-    [clearedLocationIdSet, connections, nodes, removeLocation, toggleCleared, toggleWarp],
+    [
+      clearedLocationIdSet,
+      connections,
+      nodes,
+      removeLocation,
+      startLocationId,
+      toggleCleared,
+      toggleStart,
+      toggleWarp,
+    ],
   );
 
   const { nodes: displayNodes, edges: displayEdges } = useMemo(
@@ -317,14 +412,26 @@ export default function App() {
   const persistenceState = useMemo(
     () => ({
       seedName: seedName.trim() || undefined,
+      datasetVersion,
       placedLocationIds,
       positions,
       connections,
       activatedWarpLocationIds,
+      startLocationId,
       clearedLocationIds,
       settings,
     }),
-    [activatedWarpLocationIds, clearedLocationIds, seedName, placedLocationIds, positions, connections, settings],
+    [
+      activatedWarpLocationIds,
+      clearedLocationIds,
+      connections,
+      datasetVersion,
+      placedLocationIds,
+      positions,
+      seedName,
+      settings,
+      startLocationId,
+    ],
   );
 
   const handleStorageError = useCallback((message: string) => setStorageWarning(message), []);
@@ -339,7 +446,7 @@ export default function App() {
       source.entrance.direction !== "in" &&
       target.entrance.direction !== "out" &&
       !(candidate.source === candidate.target && candidate.sourceHandle === candidate.targetHandle);
-  }, []);
+  }, [entrancesById]);
 
   const addConnection = useCallback((connection: Connection) => {
     if (!isConnectionValid(connection)) {
@@ -366,7 +473,7 @@ export default function App() {
 
     setEdges((currentEdges) => [...currentEdges, ...buildEdges([candidate])]);
     setNotice("Connection recorded. Select it and press Delete to remove it.");
-  }, [connections, isConnectionValid, setEdges, settings.defaultArrowMode]);
+  }, [connections, entrancesById, isConnectionValid, setEdges, settings.defaultArrowMode]);
 
   const reconnect = useCallback((oldEdge: Edge, connection: Connection) => {
     if (!isConnectionValid(connection)) {
@@ -394,7 +501,7 @@ export default function App() {
       edge.id === oldEdge.id ? buildEdges([candidate])[0] : edge,
     ));
     setNotice("Connection updated.");
-  }, [connections, isConnectionValid, setEdges]);
+  }, [connections, entrancesById, isConnectionValid, setEdges]);
 
   const changeArrowMode = useCallback(
     (connection: TrackerConnection, arrowMode: ArrowMode) => {
@@ -413,7 +520,7 @@ export default function App() {
       ));
       setNotice("Arrow direction updated.");
     },
-    [setEdges],
+    [entrancesById, setEdges],
   );
 
   const deleteConnection = useCallback((connectionId: string) => {
@@ -439,7 +546,7 @@ export default function App() {
       ...buildNodes([location], { [locationId]: position }, connections),
     ]);
     setNotice(`${location.name} added to the canvas.`);
-  }, [connections, nodes.length, placedLocationIdSet, setNodes]);
+  }, [connections, locationsById, nodes.length, placedLocationIdSet, setNodes]);
 
   const jumpToLocation = useCallback((locationId: string) => {
     setNodes((currentNodes) => selectLocationNode(currentNodes, locationId));
@@ -465,20 +572,26 @@ export default function App() {
     }
 
     try {
-      const result = parseTrackerSave(await file.text(), locations);
+      const result = parseTrackerSave(await file.text(), locationDefinitionsByDatasetVersion);
       if (!result.ok) {
         setNotice(`Import failed: ${result.error} Your current run was not changed.`);
         return;
       }
 
+      const importedLocations = resolveLocationDataset(result.save.datasetVersion).locations;
+      const importedLocationsById = new Map(
+        importedLocations.map((location) => [location.id, location]),
+      );
+      setDatasetVersion(result.save.datasetVersion);
       setNodes(buildNodes(
-        definitionsForIds(result.save.placedLocationIds),
+        definitionsForIds(result.save.placedLocationIds, importedLocationsById),
         result.save.positions,
         result.save.connections,
       ));
       setEdges(buildEdges(result.save.connections));
       setSeedName(result.save.seedName ?? "");
       setActivatedWarpLocationIds(result.save.activatedWarpLocationIds);
+      setStartLocationId(result.save.startLocationId);
       setClearedLocationIds(result.save.clearedLocationIds);
       setSettings(result.save.settings);
       setPersistenceAllowed(true);
@@ -500,7 +613,9 @@ export default function App() {
     setNodes([]);
     setEdges([]);
     setSeedName("");
+    setDatasetVersion(CURRENT_DATASET_VERSION);
     setActivatedWarpLocationIds([]);
+    setStartLocationId(null);
     setClearedLocationIds([]);
     setSettings({ ...DEFAULT_SETTINGS });
     setNotice("Run reset. The canvas has no locations or connections.");
@@ -510,6 +625,8 @@ export default function App() {
     <main className="app-shell">
       <TrackerToolbar
         seedName={seedName}
+        datasetVersion={datasetVersion}
+        datasetVersionLocked={connections.length > 0}
         locations={locations}
         placedLocationIds={placedLocationIdSet}
         connectionCount={connections.length}
@@ -517,6 +634,7 @@ export default function App() {
         defaultArrowMode={settings.defaultArrowMode}
         importInputRef={importInputRef}
         onSeedNameChange={setSeedName}
+        onDatasetVersionChange={changeDatasetVersion}
         onSelectLocation={jumpToLocation}
         onExport={exportRun}
         onImportClick={() => importInputRef.current?.click()}

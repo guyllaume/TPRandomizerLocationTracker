@@ -233,13 +233,19 @@ select:focus-visible,
   text-transform: uppercase;
 }
 
-.default-direction-field {
+.default-direction-field,
+.dataset-version-field {
   display: grid;
   flex: 0 0 150px;
   gap: 4px;
 }
 
-.default-direction-field span {
+.dataset-version-field {
+  flex-basis: 205px;
+}
+
+.default-direction-field span,
+.dataset-version-field span {
   color: var(--muted);
   font-size: 0.7rem;
   font-weight: 700;
@@ -247,7 +253,8 @@ select:focus-visible,
   text-transform: uppercase;
 }
 
-.default-direction-field select {
+.default-direction-field select,
+.dataset-version-field select {
   width: 100%;
   height: 36px;
   padding: 0 30px 0 10px;
@@ -587,10 +594,9 @@ select:focus-visible,
 }
 
 .location-header {
-  display: flex;
+  display: grid;
   align-items: center;
-  justify-content: space-between;
-  gap: 9px;
+  gap: 8px;
   min-height: 58px;
   padding: 10px 13px;
   background: var(--surface-muted);
@@ -604,10 +610,17 @@ select:focus-visible,
 }
 
 .location-node.is-minimized .location-header {
-  min-height: 42px;
-  padding: 6px 8px 6px 11px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px;
+  min-height: 48px;
+  padding: 7px 8px 7px 11px;
   border-bottom: 0;
   border-radius: 9px;
+}
+
+.location-node.is-minimized .location-status {
+  width: auto;
+  gap: 5px;
 }
 
 .location-node.is-minimized .location-header h2 {
@@ -626,7 +639,11 @@ select:focus-visible,
   text-transform: uppercase;
 }
 
-.location-title { min-width: 0; }
+.location-title {
+  width: 100%;
+  min-width: 0;
+  text-align: center;
+}
 
 .location-title p {
   margin: 3px 0 0;
@@ -638,6 +655,7 @@ select:focus-visible,
 .location-name-line {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
 }
 
@@ -665,9 +683,43 @@ select:focus-visible,
 
 .location-status {
   display: flex;
-  flex: 0 0 auto;
+  width: 100%;
   align-items: center;
+  justify-content: center;
   gap: 7px;
+}
+
+.start-location-toggle {
+  flex: 0 0 auto;
+  padding: 3px 6px;
+  color: var(--muted);
+  font-size: 0.52rem;
+  font-weight: 850;
+  letter-spacing: 0.045em;
+  line-height: 1.2;
+  background: transparent;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.dataset-version-field select:disabled {
+  cursor: not-allowed;
+  opacity: 0.68;
+}
+
+.start-location-toggle:hover,
+.start-location-toggle:focus-visible {
+  color: var(--warning);
+  background: var(--warning-soft);
+  border-color: var(--warning);
+}
+
+.start-location-toggle[aria-pressed="true"] {
+  color: var(--warning);
+  background: var(--warning-soft);
+  border-color: var(--warning);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--warning) 16%, transparent);
 }
 
 .clear-location {
@@ -1087,7 +1139,8 @@ select:focus-visible,
     max-width: none;
   }
 
-  .default-direction-field {
+  .default-direction-field,
+  .dataset-version-field {
     flex: 1 1 150px;
   }
 
@@ -1128,7 +1181,8 @@ select:focus-visible,
     width: 100%;
   }
 
-  .default-direction-field {
+  .default-direction-field,
+  .dataset-version-field {
     order: 3;
     flex-basis: 100%;
   }

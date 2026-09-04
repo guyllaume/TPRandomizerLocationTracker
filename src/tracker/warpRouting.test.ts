@@ -6,6 +6,7 @@ import {
   findReachableLocationIds,
   findShortestAccessibleWarpRoutes,
 } from "./graph";
+import { availableWarpDestinationIds } from "./startLocation";
 
 function connection(
   id: string,
@@ -39,6 +40,17 @@ function routes(
 }
 
 describe("accessible warp routing", () => {
+  it("treats START as an immediately available warp even without a normal portal", () => {
+    const available = availableWarpDestinationIds([], "start-without-warp");
+
+    expect(routes([], "start-without-warp", available, available)).toEqual([{
+      warpLocationId: "start-without-warp",
+      distance: 0,
+      path: ["start-without-warp"],
+      edges: [],
+    }]);
+  });
+
   it("finds a two-transition route from the selection to one accessible warp", () => {
     const result = routes([
       connection("one", "selected", "a"),

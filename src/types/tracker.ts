@@ -18,6 +18,7 @@ export type LocationKind =
   | "dungeon"
   | "boss-room";
 export type SpecialFlag = "hyrule-castle";
+export type DatasetVersion = "0.1" | "0.2";
 
 export interface EntranceSourceRow {
   sheet: string;
@@ -50,7 +51,7 @@ export interface LocationDefinition {
 
 export interface LocationDataset {
   schemaVersion: number;
-  datasetVersion: string;
+  datasetVersion: DatasetVersion;
   game: string;
   randomizerVersion: string;
   sourceWorkbook: string;
@@ -88,7 +89,9 @@ export interface TrackerSettings {
 export interface TrackerSave {
   schemaVersion: 1;
   appVersion: string;
+  datasetVersion: DatasetVersion;
   seedName?: string;
+  startLocationId: string | null;
   savedAt: string;
   placedLocationIds: string[];
   clearedLocationIds: string[];
@@ -105,10 +108,12 @@ export interface LocationNodeData extends Record<string, unknown> {
   cleared: boolean;
   presentation: "expanded" | "minimized";
   warpRouteEntranceIds: string[];
+  isStart?: boolean;
   focusState?: "selected" | "related" | "warp-route" | "warp-destination" | "dimmed";
   onRemoveLocation?: (locationId: string) => void;
   onToggleCleared?: (locationId: string) => void;
   onToggleWarp?: (locationId: string) => void;
+  onToggleStart?: (locationId: string) => void;
 }
 
 export type LocationFlowNode = Node<LocationNodeData, "location">;
