@@ -51,38 +51,38 @@ describe("accessible warp routing", () => {
     }]);
   });
 
-  it("finds a two-transition route from the selection to one accessible warp", () => {
+  it("finds a two-transition route from one accessible warp to the selection", () => {
     const result = routes([
-      connection("one", "selected", "a"),
-      connection("two", "a", "warp"),
+      connection("one", "warp", "a"),
+      connection("two", "a", "selected"),
     ], "selected", ["warp"], ["warp"]);
 
     expect(result).toHaveLength(1);
     expect(result[0]).toMatchObject({
       warpLocationId: "warp",
       distance: 2,
-      path: ["selected", "a", "warp"],
+      path: ["warp", "a", "selected"],
     });
     expect(result[0].edges.map((edge) => edge.connectionId)).toEqual(["one", "two"]);
   });
 
   it("ignores a closer inaccessible red warp", () => {
     const result = routes([
-      connection("red", "selected", "red-warp"),
-      connection("green-one", "selected", "a"),
-      connection("green-two", "a", "green-warp"),
+      connection("red", "red-warp", "selected"),
+      connection("green-one", "green-warp", "a"),
+      connection("green-two", "a", "selected"),
     ], "selected", ["red-warp", "green-warp"], ["green-warp"]);
 
-    expect(result.map((route) => route.path)).toEqual([["selected", "a", "green-warp"]]);
+    expect(result.map((route) => route.path)).toEqual([["green-warp", "a", "selected"]]);
   });
 
   it("chooses the shortest of multiple accessible warps", () => {
     const result = routes([
-      connection("s-a", "selected", "a"),
-      connection("a-w1", "a", "warp-1"),
-      connection("s-b", "selected", "b"),
-      connection("b-c", "b", "c"),
-      connection("c-w2", "c", "warp-2"),
+      connection("w1-a", "warp-1", "a"),
+      connection("a-s", "a", "selected"),
+      connection("w2-c", "warp-2", "c"),
+      connection("c-b", "c", "b"),
+      connection("b-s", "b", "selected"),
     ], "selected", ["warp-1", "warp-2"], ["warp-1", "warp-2"]);
 
     expect(result.map((route) => route.warpLocationId)).toEqual(["warp-1"]);
@@ -91,10 +91,10 @@ describe("accessible warp routing", () => {
 
   it("returns all equal-length accessible warp routes in stable ID order", () => {
     const result = routes([
-      connection("s-b", "selected", "b"),
-      connection("b-z", "b", "warp-z"),
-      connection("s-a", "selected", "a"),
-      connection("a-a", "a", "warp-a"),
+      connection("z-b", "warp-z", "b"),
+      connection("b-s", "b", "selected"),
+      connection("a-a", "warp-a", "a"),
+      connection("a-s", "a", "selected"),
     ], "selected", ["warp-z", "warp-a"], ["warp-z", "warp-a"]);
 
     expect(result.map((route) => [route.warpLocationId, route.distance])).toEqual([
@@ -114,11 +114,11 @@ describe("accessible warp routing", () => {
 
   it("does not use the selected location's own inaccessible warp", () => {
     const result = routes([
-      connection("one", "selected", "a"),
-      connection("two", "a", "green-warp"),
+      connection("one", "green-warp", "a"),
+      connection("two", "a", "selected"),
     ], "selected", ["selected", "green-warp"], ["green-warp"]);
 
-    expect(result[0].path).toEqual(["selected", "a", "green-warp"]);
+    expect(result[0].path).toEqual(["green-warp", "a", "selected"]);
   });
 
   it("returns no route when there is no accessible warp", () => {
@@ -139,10 +139,10 @@ describe("accessible warp routing", () => {
       connection("a-b", "a", "b"),
       connection("b-c", "b", "c"),
       connection("c-a", "c", "a"),
-      connection("c-warp", "c", "warp"),
+      connection("warp-a", "warp", "a"),
     ], "b", ["warp"], ["warp"]);
 
-    expect(result[0]).toMatchObject({ distance: 2, path: ["b", "c", "warp"] });
+    expect(result[0]).toMatchObject({ distance: 2, path: ["warp", "a", "b"] });
   });
 
   it("does not traverse an unresolved entrance", () => {
@@ -161,13 +161,17 @@ describe("accessible warp routing", () => {
     expect(findReachableLocationIds(graph, ["b"]).has("start")).toBe(false);
   });
 
-  it("does not use a route whose entire connection chain points from the warp", () => {
+  it("uses a route whose connection chain points from the warp to the selection", () => {
     const result = routes([
       connection("warp-a", "warp", "a"),
       connection("a-selected", "a", "selected"),
     ], "selected", ["warp"], ["warp"]);
 
-    expect(result).toEqual([]);
+    expect(result[0]).toMatchObject({
+      warpLocationId: "warp",
+      distance: 2,
+      path: ["warp", "a", "selected"],
+    });
   });
 
   it("rejects a connected chain when one middle edge points the wrong way", () => {
@@ -229,40 +233,78 @@ describe("accessible warp routing", () => {
     expect(findReachableLocationIds(graph, ["c"]).has("b")).toBe(true);
   });
 
-  it("chooses a longer playable route over a shorter reverse-only connection", () => {
+  it("chooses a longer route from a warp over a shorter connection pointing toward it", () => {
     const result = routes([
-      connection("warp-1-selected", "warp-1", "selected"),
-      connection("selected-a", "selected", "a"),
-      connection("a-b", "a", "b"),
-      connection("b-warp-2", "b", "warp-2"),
+      connection("selected-warp-1", "selected", "warp-1"),
+      connection("warp-2-b", "warp-2", "b"),
+      connection("b-a", "b", "a"),
+      connection("a-selected", "a", "selected"),
     ], "selected", ["warp-1", "warp-2"], ["warp-1", "warp-2"]);
 
     expect(result).toHaveLength(1);
     expect(result[0]).toMatchObject({
       warpLocationId: "warp-2",
       distance: 3,
-      path: ["selected", "a", "b", "warp-2"],
+      path: ["warp-2", "b", "a", "selected"],
     });
   });
 
   it("follows only the playable branch through a mixed directed graph", () => {
     const result = routes([
-      connection("selected-c", "selected", "c"),
-      connection("c-a", "c", "a"),
-      connection("a-warp", "a", "warp"),
+      connection("warp-a", "warp", "a"),
+      connection("a-c", "a", "c"),
+      connection("c-selected", "c", "selected"),
+      connection("warp-b", "warp", "b"),
+      connection("d-b", "d", "b"),
       connection("selected-d", "selected", "d"),
-      connection("b-d", "b", "d"),
-      connection("b-a", "b", "a"),
     ], "selected", ["warp"], ["warp"]);
 
     expect(result[0]).toMatchObject({
       distance: 3,
-      path: ["selected", "c", "a", "warp"],
+      path: ["warp", "a", "c", "selected"],
     });
     expect(result[0].edges.map((edge) => [edge.fromLocationId, edge.toLocationId])).toEqual([
-      ["selected", "c"],
-      ["c", "a"],
-      ["a", "warp"],
+      ["warp", "a"],
+      ["a", "c"],
+      ["c", "selected"],
+    ]);
+  });
+
+  it("routes from Lake Hylia through Gerudo Desert to selected Bulblin Camp", () => {
+    const connections: TrackerConnection[] = [{
+      id: "lake-to-desert",
+      sourceLocationId: "lake-hylia",
+      sourceEntranceId: "lake-hylia--gerudo-desert--out",
+      targetLocationId: "gerudo-desert",
+      targetEntranceId: "gerudo-desert--arrival-from-lake-hylia--in",
+      direction: "discovered",
+      arrowMode: "forward",
+    }, {
+      id: "desert-to-camp",
+      sourceLocationId: "gerudo-desert",
+      sourceEntranceId: "gerudo-desert--bulblin-camp",
+      targetLocationId: "bulblin-camp",
+      targetEntranceId: "bulblin-camp--gerudo-desert-bulblin-camp",
+      direction: "discovered",
+      arrowMode: "bidirectional",
+    }];
+
+    const result = findShortestAccessibleWarpRoutes(
+      buildLocationGraph(connections, entranceDirectionsById),
+      "bulblin-camp",
+      ["lake-hylia"],
+      new Set(["lake-hylia"]),
+    );
+
+    expect(result).toHaveLength(1);
+    expect(result[0]).toMatchObject({
+      warpLocationId: "lake-hylia",
+      distance: 2,
+      path: ["lake-hylia", "gerudo-desert", "bulblin-camp"],
+    });
+    expect(result[0].edges.map((edge) => edge.connectionId)).toEqual([
+      "lake-to-desert",
+      "desert-to-camp",
     ]);
   });
 

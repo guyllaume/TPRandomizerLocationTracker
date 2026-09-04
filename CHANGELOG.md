@@ -12,6 +12,16 @@ All notable changes to the Twilight Princess Randomizer Location Tracker will be
 
 ### Compatibility
 
+## [0.2.1] - 2026-09-04
+
+### Changed
+
+- New connections now default to bidirectional arrows.
+
+### Fixed
+
+- Warp-route highlighting now traverses from the active warp toward the selected destination.
+
 ## [0.2.0] - 2026-09-04
 
 ### Added

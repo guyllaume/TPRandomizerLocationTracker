@@ -112,7 +112,7 @@ describe("tracker save validation", () => {
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.save.connections[0].arrowMode).toBe("forward");
-      expect(result.save.settings.defaultArrowMode).toBe("forward");
+      expect(result.save.settings.defaultArrowMode).toBe("bidirectional");
       expect(result.save.settings.hidePlacedLocations).toBe(false);
       expect(result.save.activatedWarpLocationIds).toEqual([]);
       expect(result.save.clearedLocationIds).toEqual([]);

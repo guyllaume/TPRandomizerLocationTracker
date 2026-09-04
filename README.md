@@ -9,7 +9,7 @@ The tracker uses a normalized TP Randomizer entrance dataset derived from the TP
 - Search the location and entrance catalog, then add only the cards needed for your run
 - Arrange cards freely, pan and zoom the canvas, use Fit View, or navigate with the minimap
 - Record entrance connections with one-way direction support, editable arrow directions, reconnection, and deletion
-- Mark locations as cleared and activate warp points; selecting a card highlights related connections and routes to active warps
+- Mark locations as cleared and activate warp points; selecting a card highlights related connections and the shortest route from an active warp
 - Jump directly to any placed location using the toolbar search or the `/` keyboard shortcut
 - Name each run and save progress automatically in the current browser, with no account required
 - Import and export validated JSON backups without risking the active run when an import fails

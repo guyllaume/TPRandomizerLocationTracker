@@ -43,29 +43,29 @@ describe("cleared location presentation", () => {
   it("does not involve cleared state in directed warp traversal", () => {
     const connections: TrackerConnection[] = [
       {
-        id: "selected-a",
-        sourceLocationId: "selected",
-        sourceEntranceId: "selected-out",
-        targetLocationId: "a",
-        targetEntranceId: "a-in",
-        direction: "discovered",
-        arrowMode: "forward",
-      },
-      {
-        id: "a-cleared",
-        sourceLocationId: "a",
-        sourceEntranceId: "a-out",
+        id: "warp-cleared",
+        sourceLocationId: "warp",
+        sourceEntranceId: "warp-out",
         targetLocationId: "cleared",
         targetEntranceId: "cleared-in",
         direction: "discovered",
         arrowMode: "forward",
       },
       {
-        id: "cleared-warp",
+        id: "cleared-a",
         sourceLocationId: "cleared",
         sourceEntranceId: "cleared-out",
-        targetLocationId: "warp",
-        targetEntranceId: "warp-in",
+        targetLocationId: "a",
+        targetEntranceId: "a-in",
+        direction: "discovered",
+        arrowMode: "forward",
+      },
+      {
+        id: "a-selected",
+        sourceLocationId: "a",
+        sourceEntranceId: "a-out",
+        targetLocationId: "selected",
+        targetEntranceId: "selected-in",
         direction: "discovered",
         arrowMode: "forward",
       },
@@ -78,7 +78,7 @@ describe("cleared location presentation", () => {
       new Set(["warp"]),
     );
 
-    expect(clearedLocationIds.has(routes[0].path[2])).toBe(true);
-    expect(routes[0].path).toEqual(["selected", "a", "cleared", "warp"]);
+    expect(clearedLocationIds.has(routes[0].path[1])).toBe(true);
+    expect(routes[0].path).toEqual(["warp", "cleared", "a", "selected"]);
   });
 });

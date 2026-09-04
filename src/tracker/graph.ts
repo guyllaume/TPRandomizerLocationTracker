@@ -269,8 +269,9 @@ export function findReachableLocationIds(
 
 /**
  * Finds every accessible warp tied for the fewest directed transitions from
- * the selected location. The BFS follows outgoing edges from the selection,
- * so a warp is eligible only when Link can actually enter that warp location.
+ * the selected location. Each BFS starts at an available warp because the
+ * player teleports there first, then follows outgoing entrances toward the
+ * selected destination.
  */
 export function findShortestAccessibleWarpRoutes(
   graph: LocationGraph,
@@ -283,46 +284,41 @@ export function findShortestAccessibleWarpRoutes(
     .sort();
   if (accessibleWarps.length === 0) return [];
 
-  const visited = new Set<string>([selectedLocationId]);
-  const distanceByLocation = new Map<string, number>([[selectedLocationId, 0]]);
-  const previousEdgeByLocation = new Map<string, LocationGraphEdge>();
-  const queue = [selectedLocationId];
-  for (let index = 0; index < queue.length; index += 1) {
-    const current = queue[index];
-    const currentDistance = distanceByLocation.get(current) ?? 0;
-    for (const edge of graph.get(current) ?? []) {
-      if (visited.has(edge.toLocationId)) continue;
-      visited.add(edge.toLocationId);
-      distanceByLocation.set(edge.toLocationId, currentDistance + 1);
-      previousEdgeByLocation.set(edge.toLocationId, edge);
-      queue.push(edge.toLocationId);
+  const routes = accessibleWarps.flatMap((warpLocationId): AccessibleWarpRoute[] => {
+    const visited = new Set<string>([warpLocationId]);
+    const previousEdgeByLocation = new Map<string, LocationGraphEdge>();
+    const queue = [warpLocationId];
+    for (let index = 0; index < queue.length && !visited.has(selectedLocationId); index += 1) {
+      const current = queue[index];
+      for (const edge of graph.get(current) ?? []) {
+        if (visited.has(edge.toLocationId)) continue;
+        visited.add(edge.toLocationId);
+        previousEdgeByLocation.set(edge.toLocationId, edge);
+        queue.push(edge.toLocationId);
+      }
     }
-  }
 
-  const reachableWarps = accessibleWarps.filter((warpLocationId) => visited.has(warpLocationId));
-  if (reachableWarps.length === 0) return [];
-  const shortestDistance = Math.min(
-    ...reachableWarps.map((warpLocationId) => distanceByLocation.get(warpLocationId) ?? Infinity),
-  );
-
-  return reachableWarps
-    .filter((warpLocationId) => distanceByLocation.get(warpLocationId) === shortestDistance)
-    .map((warpLocationId): AccessibleWarpRoute => {
+    if (!visited.has(selectedLocationId)) return [];
     const reversedEdges: LocationGraphEdge[] = [];
-    let current = warpLocationId;
-    while (current !== selectedLocationId) {
+    let current = selectedLocationId;
+    while (current !== warpLocationId) {
       const edge = previousEdgeByLocation.get(current);
       if (!edge) break;
       reversedEdges.push(edge);
       current = edge.fromLocationId;
     }
     const edges = reversedEdges.reverse();
-    return {
+    return [{
       warpLocationId,
       distance: edges.length,
-      path: [selectedLocationId, ...edges.map((edge) => edge.toLocationId)],
+      path: [warpLocationId, ...edges.map((edge) => edge.toLocationId)],
       edges,
-    };
-    })
+    }];
+  });
+  if (routes.length === 0) return [];
+  const shortestDistance = Math.min(...routes.map((route) => route.distance));
+
+  return routes
+    .filter((route) => route.distance === shortestDistance)
     .sort((left, right) => left.warpLocationId.localeCompare(right.warpLocationId));
 }

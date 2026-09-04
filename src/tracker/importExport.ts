@@ -285,7 +285,7 @@ function validateCurrentSave(
     return { ok: false, error: "The save has invalid tracker settings." };
   }
 
-  const defaultArrowMode = value.settings.defaultArrowMode ?? "forward";
+  const defaultArrowMode = value.settings.defaultArrowMode ?? DEFAULT_SETTINGS.defaultArrowMode;
   if (!isArrowMode(defaultArrowMode)) {
     return { ok: false, error: "The save has an invalid default arrow mode." };
   }
