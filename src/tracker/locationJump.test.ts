@@ -16,11 +16,15 @@ function node(id: string, selected = false): LocationFlowNode {
         primaryGroup: "Test",
         entrances: [],
       },
+      selected: false,
       connectedEntranceIds: [],
       accessible: false,
       cleared: false,
       presentation: "expanded",
       warpRouteEntranceIds: [],
+      focusedConnectionEntranceIds: [],
+      connectionIdsByEntranceId: {},
+      connectionEndpointFocused: false,
     },
   };
 }

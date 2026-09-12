@@ -100,6 +100,41 @@ describe("tracker persistence", () => {
     expect(result.save?.startLocationId).toBe("coro-s-house");
   });
 
+  it("persists and reloads an explicitly selected connection color", () => {
+    const save = createTrackerSave({
+      placedLocationIds: ["coro-s-house", "link-s-house"],
+      positions: {
+        "coro-s-house": { x: 12, y: 34 },
+        "link-s-house": { x: 250, y: 34 },
+      },
+      connections: [{
+        id: "colored-connection",
+        sourceLocationId: "coro-s-house",
+        sourceEntranceId: "coro-s-house--lower",
+        targetLocationId: "link-s-house",
+        targetEntranceId: "link-s-house--door",
+        direction: "discovered",
+        arrowMode: "bidirectional",
+        color: "blue",
+      }],
+      settings: {
+        showMinimap: false,
+        defaultArrowMode: "forward",
+        hidePlacedLocations: false,
+      },
+    });
+    let stored = "";
+    writeStoredTracker(save, { setItem: (_key, value) => { stored = value; } });
+
+    const result = readStoredTracker(locationDefinitionsByDatasetVersion, {
+      getItem: () => stored,
+    });
+
+    expect(result.save?.schemaVersion).toBe(1);
+    expect(result.save?.connections).toHaveLength(1);
+    expect(result.save?.connections[0].color).toBe("blue");
+  });
+
   it("persists application and schema metadata", () => {
     const save = createTrackerSave({
       placedLocationIds: [],

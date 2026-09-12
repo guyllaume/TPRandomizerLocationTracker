@@ -8,7 +8,9 @@ interface LocationPaletteProps {
   placedLocationIds: Set<string>;
   activatedWarpLocationIds: ReadonlySet<string>;
   hidePlaced: boolean;
+  collapsed: boolean;
   onHidePlacedChange: (hide: boolean) => void;
+  onCollapsedChange: (collapsed: boolean) => void;
   onAddLocation: (locationId: string) => void;
 }
 
@@ -17,7 +19,9 @@ function LocationPaletteComponent({
   placedLocationIds,
   activatedWarpLocationIds,
   hidePlaced,
+  collapsed,
   onHidePlacedChange,
+  onCollapsedChange,
   onAddLocation,
 }: LocationPaletteProps) {
   const [query, setQuery] = useState("");
@@ -44,7 +48,29 @@ function LocationPaletteComponent({
   const matchCount = [...groups.values()].reduce((total, group) => total + group.length, 0);
 
   return (
-    <aside className="location-palette" aria-label="Add or search locations">
+    <aside
+      className={`location-palette ${collapsed ? "is-collapsed" : ""}`.trim()}
+      aria-label="Add or search locations"
+    >
+      <button
+        type="button"
+        className="palette-collapse-button"
+        onClick={() => onCollapsedChange(!collapsed)}
+        aria-expanded={!collapsed}
+        aria-controls="location-palette-content"
+        title={collapsed ? "Expand location sidebar" : "Collapse location sidebar"}
+      >
+        <span aria-hidden="true">{collapsed ? "›" : "‹"}</span>
+        <span className="visually-hidden">
+          {collapsed ? "Expand location sidebar" : "Collapse location sidebar"}
+        </span>
+      </button>
+      {collapsed && <span className="palette-collapsed-label" aria-hidden="true">Locations</span>}
+      <div
+        id="location-palette-content"
+        className="palette-content"
+        aria-hidden={collapsed || undefined}
+      >
       <div className="palette-header">
         <div>
           <h2>Locations</h2>
@@ -118,6 +144,7 @@ function LocationPaletteComponent({
           </section>
         ))}
         {matchCount === 0 && <p className="palette-empty">No matching locations or entrances.</p>}
+      </div>
       </div>
     </aside>
   );

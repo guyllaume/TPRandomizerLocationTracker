@@ -44,6 +44,21 @@ describe("tracker save validation", () => {
     }
   });
 
+  it("round-trips optional connection colors without changing paired identity", () => {
+    const save = validSave();
+    save.connections[0].color = "violet";
+
+    const result = parseTrackerSave(JSON.stringify(save), locationDefinitionsByDatasetVersion);
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.save.schemaVersion).toBe(1);
+      expect(result.save.connections).toHaveLength(1);
+      expect(result.save.connections[0]).toEqual(save.connections[0]);
+      expect(result.save.connections[0].id).toBe("connection-1");
+    }
+  });
+
   it("writes independent application and schema version metadata", () => {
     const save = validSave();
 
@@ -112,12 +127,24 @@ describe("tracker save validation", () => {
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.save.connections[0].arrowMode).toBe("forward");
+      expect(result.save.connections[0].color).toBeUndefined();
       expect(result.save.settings.defaultArrowMode).toBe("bidirectional");
       expect(result.save.settings.hidePlacedLocations).toBe(false);
       expect(result.save.activatedWarpLocationIds).toEqual([]);
       expect(result.save.clearedLocationIds).toEqual([]);
       expect(result.save.startLocationId).toBeNull();
     }
+  });
+
+  it("rejects unsupported connection colors", () => {
+    const save = validSave() as unknown as {
+      connections: Array<Record<string, unknown>>;
+    };
+    save.connections[0].color = "invisible";
+
+    const result = validateTrackerSave(save, locationDefinitionsByDatasetVersion);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error).toContain("unsupported color");
   });
 
   it("classifies an unversioned v0.1 save as legacy and preserves its old connection", () => {

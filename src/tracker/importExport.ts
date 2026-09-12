@@ -18,6 +18,7 @@ import {
   TRACKER_SCHEMA_VERSION,
 } from "./constants";
 import { endpointsKey } from "./graph";
+import { isConnectionColor } from "./connectionPresentation";
 
 export const MAX_TRACKER_IMPORT_BYTES = 5 * 1024 * 1024;
 
@@ -236,6 +237,9 @@ function validateConnection(
   if (!isArrowMode(arrowMode)) {
     return { ok: false, error: `Connection ${index + 1} has an unsupported arrow mode.` };
   }
+  if (value.color !== undefined && !isConnectionColor(value.color)) {
+    return { ok: false, error: `Connection ${index + 1} has an unsupported color.` };
+  }
   if (
     (sourceEntrance.direction !== "both" || targetEntrance.direction !== "both") &&
     arrowMode !== "forward"
@@ -243,18 +247,18 @@ function validateConnection(
     return { ok: false, error: `Connection ${index + 1} reverses a one-way entrance.` };
   }
 
-  return {
-    ok: true,
-    connection: {
-      id: value.id as string,
-      sourceLocationId,
-      sourceEntranceId,
-      targetLocationId,
-      targetEntranceId,
-      direction: "discovered",
-      arrowMode,
-    },
+  const connection: TrackerConnection = {
+    id: value.id as string,
+    sourceLocationId,
+    sourceEntranceId,
+    targetLocationId,
+    targetEntranceId,
+    direction: "discovered",
+    arrowMode,
   };
+  if (isConnectionColor(value.color)) connection.color = value.color;
+
+  return { ok: true, connection };
 }
 
 function validateCurrentSave(

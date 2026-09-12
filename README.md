@@ -7,10 +7,15 @@ The tracker uses a normalized TP Randomizer entrance dataset derived from the TP
 ## Features
 
 - Search the location and entrance catalog, then add only the cards needed for your run
-- Arrange cards freely, pan and zoom the canvas, use Fit View, or navigate with the minimap
+- Arrange cards freely, pan and zoom the canvas, collapse the location sidebar, use Fit View, or navigate with the minimap
 - Record entrance connections with one-way direction support, editable arrow directions, reconnection, and deletion
+- Assign readable colors to individual connections and hover a line or connected entrance to trace its endpoints
 - Mark locations as cleared and activate warp points; selecting a card highlights related connections and the shortest route from an active warp
+- Ctrl-click or Command-click cards to select several, or Shift-drag empty space to box-select them, then drag any selected card to move the group together
+- Undo and redo tracker edits from the header or with Ctrl+Z, Ctrl+Y, and Ctrl+Shift+Z
 - Jump directly to any placed location using the toolbar search or the `/` keyboard shortcut
+- Choose a persistent System, Light, or Dark application theme
+- Read location types, START, and active or inactive warp destinations from the color-coded minimap and its expandable legend
 - Name each run and save progress automatically in the current browser, with no account required
 - Import and export validated JSON backups without risking the active run when an import fails
 - Safely remove disconnected cards or reset the entire run after confirmation

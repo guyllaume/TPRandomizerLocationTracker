@@ -7,6 +7,7 @@ import type {
   TrackerConnection,
   TrackerFlowEdge,
 } from "../types/tracker";
+import { connectionColorCss } from "./connectionPresentation";
 
 export interface LocationGraphEdge {
   connectionId: string;
@@ -31,6 +32,7 @@ export function buildNodes(
   connections: TrackerConnection[],
 ): LocationFlowNode[] {
   const connectedByLocation = connectedEntrancesByLocation(connections);
+  const connectionIdsByLocation = connectionIdsByEntranceAndLocation(connections);
 
   return definitions.map((location, index) => ({
     id: location.id,
@@ -41,12 +43,19 @@ export function buildNodes(
     },
     data: {
       location,
+      selected: false,
       connectedEntranceIds: [...(connectedByLocation.get(location.id) ?? [])],
       accessible: false,
       cleared: false,
       presentation: "expanded",
       warpRouteEntranceIds: [],
+      focusedConnectionEntranceIds: [],
+      connectionIdsByEntranceId: Object.fromEntries(
+        connectionIdsByLocation.get(location.id) ?? [],
+      ),
+      connectionEndpointFocused: false,
       isStart: false,
+      hasStartLocation: false,
     },
     deletable: false,
   }));
@@ -54,11 +63,12 @@ export function buildNodes(
 
 export function buildEdges(connections: TrackerConnection[]): TrackerFlowEdge[] {
   return connections.map((connection) => {
+    const color = connectionColorCss(connection.color);
     const marker = {
       type: MarkerType.ArrowClosed,
       width: 18,
       height: 18,
-      color: "var(--accent)",
+      color,
     };
 
     return {
@@ -70,7 +80,7 @@ export function buildEdges(connections: TrackerConnection[]): TrackerFlowEdge[] 
       data: { connection },
       markerStart: connection.arrowMode !== "forward" ? marker : undefined,
       markerEnd: connection.arrowMode !== "reverse" ? marker : undefined,
-      style: { strokeWidth: 2 },
+      style: { stroke: color, strokeWidth: 2 },
       type: "tracker" as const,
     };
   });
@@ -103,7 +113,7 @@ export function connectionFromFlow(
 export function edgeToConnection(edge: TrackerFlowEdge): TrackerConnection | null {
   if (!edge.sourceHandle || !edge.targetHandle) return null;
 
-  return {
+  const connection: TrackerConnection = {
     id: edge.id,
     sourceLocationId: edge.source,
     sourceEntranceId: edge.sourceHandle,
@@ -112,6 +122,9 @@ export function edgeToConnection(edge: TrackerFlowEdge): TrackerConnection | nul
     direction: "discovered",
     arrowMode: edge.data?.connection.arrowMode ?? "forward",
   };
+  const color = edge.data?.connection.color;
+  if (color) connection.color = color;
+  return connection;
 }
 
 export function positionsFromNodes(
@@ -129,21 +142,47 @@ export function updateNodeConnectionData(
   onToggleWarp?: (locationId: string) => void,
   startLocationId?: string | null,
   onToggleStart?: (locationId: string) => void,
+  onConnectionHoverChange?: (connectionIds: readonly string[]) => void,
 ): LocationFlowNode[] {
   const connectedByLocation = connectedEntrancesByLocation(connections);
+  const connectionIdsByLocation = connectionIdsByEntranceAndLocation(connections);
   return nodes.map((node) => ({
     ...node,
     data: {
       ...node.data,
       connectedEntranceIds: [...(connectedByLocation.get(node.id) ?? [])],
+      connectionIdsByEntranceId: Object.fromEntries(
+        connectionIdsByLocation.get(node.id) ?? [],
+      ),
       cleared: clearedLocationIds.has(node.id),
       isStart: node.id === startLocationId,
+      hasStartLocation: startLocationId !== null && startLocationId !== undefined,
       onRemoveLocation,
       onToggleCleared,
       onToggleWarp,
       onToggleStart,
+      onConnectionHoverChange,
     },
   }));
+}
+
+function connectionIdsByEntranceAndLocation(
+  connections: TrackerConnection[],
+): Map<string, Map<string, string[]>> {
+  const result = new Map<string, Map<string, string[]>>();
+  for (const connection of connections) {
+    for (const [locationId, entranceId] of [
+      [connection.sourceLocationId, connection.sourceEntranceId],
+      [connection.targetLocationId, connection.targetEntranceId],
+    ] as const) {
+      const byEntrance = result.get(locationId) ?? new Map<string, string[]>();
+      const connectionIds = byEntrance.get(entranceId) ?? [];
+      connectionIds.push(connection.id);
+      byEntrance.set(entranceId, connectionIds);
+      result.set(locationId, byEntrance);
+    }
+  }
+  return result;
 }
 
 function connectedEntrancesByLocation(

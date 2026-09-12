@@ -12,6 +12,63 @@ All notable changes to the Twilight Princess Randomizer Location Tracker will be
 
 ### Compatibility
 
+## [0.3.0]
+
+### Added
+
+- Multi-location selection with **Ctrl-click** / **Command-click**, including a compact selected-location count.
+- **Shift-drag marquee selection** for quickly selecting multiple locations on the map.
+- Group dragging for selected locations while preserving their relative positions.
+- **Undo / Redo** support for major tracker actions, including location movement, entrance connections, START and warp changes, and other supported run-state edits.
+- Undo / Redo toolbar controls and standard keyboard shortcuts.
+- Optional per-connection colors with save, export, and import support.
+- **Connection focus/highlighting** when hovering a connection or one of its entrance endpoints, making dense routes easier to follow.
+- Batch actions for selected connections, including color, arrow-direction, and deletion controls.
+- Explicit **System, Light, and Dark** theme options instead of relying only on the browser's default theme.
+- A collapsible location sidebar to reclaim additional map space.
+- Location-type colors on the minimap.
+- START and warp status indicators on minimap locations.
+- A compact, expandable minimap legend explaining location colors and status markers.
+
+### Changed
+
+- Completely reworked location-card selection so **selection and dragging are separate interactions**.
+  - Clicking selects a card only after release.
+  - Moving beyond the drag threshold begins movement without unintentionally changing the current selection.
+- Dragging any location in a multi-selection now moves the whole selection together.
+- Autosave pauses while locations are actively being moved and saves their final positions when the drag completes.
+- Improved the existing connection-color controls and added support for applying connection actions to multiple selected connections.
+- Connection highlighting now de-emphasizes unrelated routes without changing the user's location selection.
+- Reorganized the header into clearer **Run, Navigation, Editing, and View** groups.
+- Increased the usable width of the **Run Name** and **Jump to Location** fields for normal desktop and 1080p displays.
+- Simplified START controls:
+
+  - once a START location is set, `Set Start` is hidden from other location cards;
+  - the active START location exposes only the relevant `Clear Start` action.
+- Integrated multi-selection feedback into the editing controls without increasing the header height.
+- Updated the minimap so location color represents location type while START and warp state use separate markers.
+- Improved general light/dark theme consistency across tracker controls, cards, overlays, connections, and minimap elements.
+
+### Compatibility
+
+- Existing **v0.2.x** tracker states and exported runs remain supported.
+- Save data continues to use **schema version 1**.
+- Existing connection IDs and entrance IDs are unchanged.
+- Existing location datasets are unchanged in v0.3.0.
+- Paired entrance connections retain their existing semantics and persisted representation.
+- Import/export does **not** introduce separate IN/OUT or directional entrance state.
+- No save migration or schema reset is required when upgrading from v0.2.x.
+
+### Deferred
+
+The following entrance-model changes are intentionally deferred to **v0.4.0** so they can be designed together:
+
+- IN-left / OUT-right entrance presentation
+- decoupled entrance handling
+- unpaired entrance support and additional entrances
+- any required directional connection or persistence changes
+
+
 ## [0.2.1] - 2026-09-04
 
 ### Changed
