@@ -76,9 +76,11 @@ export interface TrackerConnection {
   targetEntranceId: string;
   direction: "discovered";
   arrowMode: ArrowMode;
+  color?: ConnectionColor;
 }
 
 export type ArrowMode = "forward" | "reverse" | "bidirectional";
+export type ConnectionColor = "blue" | "violet" | "orange" | "rose";
 
 export interface TrackerSettings {
   showMinimap: boolean;
@@ -103,21 +105,28 @@ export interface TrackerSave {
 
 export interface LocationNodeData extends Record<string, unknown> {
   location: LocationDefinition;
+  selected: boolean;
   connectedEntranceIds: string[];
   accessible: boolean;
   cleared: boolean;
   presentation: "expanded" | "minimized";
   warpRouteEntranceIds: string[];
+  focusedConnectionEntranceIds: string[];
+  connectionIdsByEntranceId: Record<string, string[]>;
+  connectionEndpointFocused: boolean;
   isStart?: boolean;
+  hasStartLocation?: boolean;
   focusState?: "selected" | "related" | "warp-route" | "warp-destination" | "dimmed";
   onRemoveLocation?: (locationId: string) => void;
   onToggleCleared?: (locationId: string) => void;
   onToggleWarp?: (locationId: string) => void;
   onToggleStart?: (locationId: string) => void;
+  onConnectionHoverChange?: (connectionIds: readonly string[]) => void;
 }
 
 export type LocationFlowNode = Node<LocationNodeData, "location">;
 export type TrackerFlowEdge = Edge<{
   connection: TrackerConnection;
   focusState?: "related" | "warp-route" | "dimmed";
+  connectionFocusState?: "focused" | "dimmed";
 }, "tracker">;

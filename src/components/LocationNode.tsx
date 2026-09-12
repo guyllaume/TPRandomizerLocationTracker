@@ -5,7 +5,7 @@ import redWarpIcon from "../../icons/ezgif-4cc6456631015bee.png";
 import type { LocationFlowNode } from "../types/tracker";
 import { EntranceHandle } from "./EntranceHandle";
 
-function LocationNodeComponent({ id, data, selected }: NodeProps<LocationFlowNode>) {
+function LocationNodeComponent({ id, data }: NodeProps<LocationFlowNode>) {
   const connected = new Set(data.connectedEntranceIds);
   const isSpecial = data.location.specialFlags?.includes("hyrule-castle");
   const focusClass = data.focusState ? `is-${data.focusState}` : "";
@@ -24,9 +24,11 @@ function LocationNodeComponent({ id, data, selected }: NodeProps<LocationFlowNod
 
   const cardClasses = [
     "location-node",
-    selected && "is-selected",
+    "nokey",
+    data.selected && "is-selected",
     data.cleared && "is-cleared",
     isMinimized && "is-minimized",
+    data.connectionEndpointFocused && "has-focused-connection",
     focusClass,
   ].filter(Boolean).join(" ");
 
@@ -41,16 +43,19 @@ function LocationNodeComponent({ id, data, selected }: NodeProps<LocationFlowNod
           {!isMinimized && <p>{data.location.primaryGroup}</p>}
         </div>
         <div className="location-status">
-          {!isMinimized && (
+          {(!data.hasStartLocation || data.isStart) && (!isMinimized || data.isStart) && (
             <button
               type="button"
               className="start-location-toggle nodrag nopan"
               aria-label={`${data.isStart ? "Clear" : "Set"} ${data.location.name} as START`}
               aria-pressed={data.isStart}
               title={data.isStart ? "Clear Start" : "Set as Start"}
-              onClick={() => data.onToggleStart?.(id)}
+              onClick={(event) => {
+                event.stopPropagation();
+                data.onToggleStart?.(id);
+              }}
             >
-              {data.isStart ? "START" : "Set start"}
+              {data.isStart ? "Clear Start" : "Set Start"}
             </button>
           )}
           {data.location.hasWarp && (
@@ -60,7 +65,10 @@ function LocationNodeComponent({ id, data, selected }: NodeProps<LocationFlowNod
               aria-label={`${data.accessible ? "Deactivate" : "Activate"} ${data.location.name} warp`}
               aria-pressed={data.accessible}
               title={data.accessible ? "Deactivate warp" : "Activate warp"}
-              onClick={() => data.onToggleWarp?.(id)}
+              onClick={(event) => {
+                event.stopPropagation();
+                data.onToggleWarp?.(id);
+              }}
             >
               <img
                 className="warp-icon"
@@ -91,7 +99,10 @@ function LocationNodeComponent({ id, data, selected }: NodeProps<LocationFlowNod
             <button
               type="button"
               className="remove-location nodrag nopan"
-              onClick={() => data.onRemoveLocation?.(id)}
+              onClick={(event) => {
+                event.stopPropagation();
+                data.onRemoveLocation?.(id);
+              }}
               aria-label={`Remove ${data.location.name} from the canvas`}
               title={connected.size > 0 ? "Disconnect this location before removing it" : "Remove from canvas"}
             >
@@ -110,6 +121,9 @@ function LocationNodeComponent({ id, data, selected }: NodeProps<LocationFlowNod
             entrance={entrance}
             connected={connected.has(entrance.id)}
             onWarpRoute={routeEntrances.has(entrance.id)}
+            connectionIds={data.connectionIdsByEntranceId[entrance.id]}
+            connectionFocused={data.focusedConnectionEntranceIds.includes(entrance.id)}
+            onConnectionHoverChange={data.onConnectionHoverChange}
           />
         ))}
       </div>

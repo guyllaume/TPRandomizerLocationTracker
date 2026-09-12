@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { locationsById } from "../data/locations";
 import type { TrackerConnection } from "../types/tracker";
-import { buildEdges, buildNodes, edgeToConnection, positionsFromNodes } from "./graph";
+import {
+  buildEdges,
+  buildNodes,
+  edgeToConnection,
+  positionsFromNodes,
+  updateNodeConnectionData,
+} from "./graph";
 
 describe("location graph state", () => {
   it("starts with no nodes or edges for a fresh run", () => {
@@ -35,5 +41,72 @@ describe("location graph state", () => {
     };
     const [edge] = buildEdges([connection]);
     expect(edgeToConnection(edge)).toEqual(connection);
+    expect(edge.style?.stroke).toBe("var(--connection-default)");
+  });
+
+  it("applies and round-trips one explicitly selected connection color", () => {
+    const connection: TrackerConnection = {
+      id: "colored-connection",
+      sourceLocationId: "coro-s-house",
+      sourceEntranceId: "coro-s-house--lower",
+      targetLocationId: "link-s-house",
+      targetEntranceId: "link-s-house--door",
+      direction: "discovered",
+      arrowMode: "bidirectional",
+      color: "orange",
+    };
+    const [edge] = buildEdges([connection]);
+
+    expect(edge.style?.stroke).toBe("var(--connection-orange)");
+    expect(edge.markerStart).toMatchObject({ color: "var(--connection-orange)" });
+    expect(edge.markerEnd).toMatchObject({ color: "var(--connection-orange)" });
+    expect(edgeToConnection(edge)).toEqual(connection);
+  });
+
+  it("retains every connection ID associated with one entrance", () => {
+    const coro = locationsById.get("coro-s-house");
+    const connections: TrackerConnection[] = [
+      {
+        id: "first",
+        sourceLocationId: "coro-s-house",
+        sourceEntranceId: "coro-s-house--lower",
+        targetLocationId: "link-s-house",
+        targetEntranceId: "link-s-house--door",
+        direction: "discovered",
+        arrowMode: "forward",
+      },
+      {
+        id: "second",
+        sourceLocationId: "coro-s-house",
+        sourceEntranceId: "coro-s-house--lower",
+        targetLocationId: "kakariko-village",
+        targetEntranceId: "kakariko-village--eldin-field",
+        direction: "discovered",
+        arrowMode: "forward",
+      },
+    ];
+
+    const [node] = buildNodes(coro ? [coro] : [], {}, connections);
+    expect(node.data.connectionIdsByEntranceId["coro-s-house--lower"])
+      .toEqual(["first", "second"]);
+  });
+
+  it("tells every card when a START location already exists", () => {
+    const definitions = ["link-s-house", "ordon-spring"]
+      .map((id) => locationsById.get(id))
+      .filter((location) => location !== undefined);
+    const nodes = updateNodeConnectionData(
+      buildNodes(definitions, {}, []),
+      [],
+      new Set(),
+      undefined,
+      undefined,
+      undefined,
+      "ordon-spring",
+    );
+
+    expect(nodes.every((node) => node.data.hasStartLocation)).toBe(true);
+    expect(nodes.find((node) => node.id === "ordon-spring")?.data.isStart).toBe(true);
+    expect(nodes.find((node) => node.id === "link-s-house")?.data.isStart).toBe(false);
   });
 });

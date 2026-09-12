@@ -6,6 +6,9 @@ interface EntranceHandleProps {
   entrance: EntranceDefinition;
   connected: boolean;
   onWarpRoute?: boolean;
+  connectionIds?: readonly string[];
+  connectionFocused?: boolean;
+  onConnectionHoverChange?: (connectionIds: readonly string[]) => void;
 }
 
 const TYPE_LABELS: Record<EntranceDefinition["type"], string> = {
@@ -18,7 +21,14 @@ const TYPE_LABELS: Record<EntranceDefinition["type"], string> = {
   "boss-room": "Boss",
 };
 
-function EntranceHandleComponent({ entrance, connected, onWarpRoute = false }: EntranceHandleProps) {
+function EntranceHandleComponent({
+  entrance,
+  connected,
+  onWarpRoute = false,
+  connectionIds,
+  connectionFocused = false,
+  onConnectionHoverChange,
+}: EntranceHandleProps) {
   const directionLabel = entrance.direction === "out"
     ? "Outgoing only"
     : entrance.direction === "in"
@@ -29,7 +39,18 @@ function EntranceHandleComponent({ entrance, connected, onWarpRoute = false }: E
 
   return (
     <div
-      className={`entrance-row nodrag nopan ${connected ? "is-connected" : ""} ${onWarpRoute ? "is-warp-route" : ""}`.trim()}
+      className={[
+        "entrance-row nodrag nopan",
+        connected && "is-connected",
+        onWarpRoute && "is-warp-route",
+        connectionFocused && "is-connection-focused",
+      ].filter(Boolean).join(" ")}
+      onMouseEnter={connectionIds?.length
+        ? () => onConnectionHoverChange?.(connectionIds)
+        : undefined}
+      onMouseLeave={connectionIds?.length
+        ? () => onConnectionHoverChange?.([])
+        : undefined}
       title={`${entrance.name} · ${details}`}
     >
       <span className="entrance-type-dot" data-type={entrance.type} aria-hidden="true" />
